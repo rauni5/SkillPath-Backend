@@ -1,0 +1,7 @@
+.env
+*.env
+service-account.json
+firebase-adminsdk*.json
+skillpath_app/.dart_tool/
+skillpath_app/build/
+backend/target/
