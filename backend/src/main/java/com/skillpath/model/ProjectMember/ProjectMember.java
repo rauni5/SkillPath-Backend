@@ -12,5 +12,5 @@ public class ProjectMember {
  @Column(length = 100) private String role;
  @Enumerated(EnumType.STRING) @Builder.Default
  private MemberStatus status = MemberStatus.PENDING;
- @Column(name = "joined_at") private Instant joinedAt = Instant.now();
+ @Column(name = "joined_at") final private Instant joinedAt = Instant.now();
 }

@@ -1,5 +1,4 @@
 package com.skillpath.model.RoleRequiredSkill;
-import com.skillpath.model.RoleRequiredSkillId;
 
 import jakarta.persistence.*;
 import lombok.*;

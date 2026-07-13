@@ -7,5 +7,5 @@ import java.time.Instant;
 public class UserCareerGoal {
  @Id @Column(name = "user_id") private Long userId;
  @Column(name = "role_id") private Long roleId;
- @Column(name = "set_at") private Instant setAt = Instant.now();
+ @Column(name = "set_at") final private Instant setAt = Instant.now();
 }
