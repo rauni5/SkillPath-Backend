@@ -1,4 +1,4 @@
-package com.skillpath.model;
+package com.skillpath.model.UserSkill;
 import lombok.*;
 import java.io.Serializable;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @EqualsAndHashCode

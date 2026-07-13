@@ -1,5 +1,4 @@
 package com.skillpath.model.UserSkill;
-import com.skillpath.model.UserSkillId;
 import com.skillpath.model.enums.Proficiency;
 import jakarta.persistence.*;
 import lombok.*;
@@ -11,5 +10,5 @@ public class UserSkill {
  @Id @Column(name = "user_id") private Long userId;
  @Id @Column(name = "skill_id") private Long skillId;
  @Enumerated(EnumType.STRING) private Proficiency proficiency;
- @Column(name = "added_at") private Instant addedAt = Instant.now();
+ @Column(name = "added_at") final private Instant addedAt = Instant.now();
 }
