@@ -1,15 +1,38 @@
 spring:
-    datasource:
-        url: jdbc:postgresql://localhost:5432/skillpath
-        username: skillpath
-        password: ${DB_PASSWORD}
-    jpa:
-        hibernate:
-            ddl-auto: validate
-        show-sql: false
-    flyway:
-        enabled: true
+  datasource:
+    url:      jdbc:postgresql://localhost:5432/skillpath
+    username: skillpath
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle:      2
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  flyway:
+    enabled:   true
+    locations: classpath:db/migration
 firebase:
-    service-account: ${FIREBASE_SERVICE_ACCOUNT}
+  service-account: ${FIREBASE_SERVICE_ACCOUNT}
 server:
-    port: 8080
+  port: 8080
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path:               /swagger-ui.html
+    operationsSorter:   method
+logging:
+  level:
+    root: WARN
+    "[com.skillpath]": INFO
+    "[org.springframework]": WARN
+    "[org.hibernate]": WARN
+    "[org.flywaydb]": INFO
