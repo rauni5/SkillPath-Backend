@@ -6,6 +6,7 @@ import com.skillpath.security.FirebasePrincipal;
 import com.skillpath.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import java.util.List;
 import org.springframework.data.domain.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 public class ProjectController {
     private final ProjectService projectService;
     private final UserService userService;
+    private final RecommendationService recommendationService;
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ProjectResponse>>> browse(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
         return ResponseEntity.ok(ApiResponse.ok(projectService.browseOpen(PageRequest.of(page, size))));
@@ -39,5 +41,9 @@ public class ProjectController {
     public ResponseEntity<ApiResponse<Void>> updateMember(@PathVariable Long id, @PathVariable Long userId,@Valid @RequestBody UpdateMemberStatusRequest req) {
         projectService.updateMemberStatus(id, userId, req);
         return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+    @GetMapping("/{id}/recommended-members")
+    public ResponseEntity<ApiResponse<List<MatchScoreResponse>>> recommended(@PathVariable Long id,@RequestParam(defaultValue = "5") int topN) {
+        return ResponseEntity.ok(ApiResponse.ok(recommendationService.recommendTeammates(id, topN)));
     }
 }
