@@ -1,0 +1,15 @@
+spring:
+    datasource:
+        url: jdbc:postgresql://localhost:5432/skillpath
+        username: skillpath
+        password: ${DB_PASSWORD}
+    jpa:
+        hibernate:
+            ddl-auto: validate
+        show-sql: false
+    flyway:
+        enabled: true
+firebase:
+    service-account: ${FIREBASE_SERVICE_ACCOUNT}
+server:
+    port: 8080
