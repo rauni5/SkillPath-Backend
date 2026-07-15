@@ -19,6 +19,7 @@ public class ProjectService {
     private final ProjectRequiredSkillRepository reqSkillRepo;
     private final ProjectMemberRepository memberRepo;
     private final SkillRepository skillRepo;
+    private final PortfolioService portfolioService;
     public Page<ProjectResponse> browseOpen(Pageable pageable) {
         return projectRepo.findByStatus(ProjectStatus.OPEN, pageable).map(this::enrich);
     }
@@ -61,5 +62,33 @@ public class ProjectService {
         ProjectResponse resp = ProjectResponse.from(p);
         resp.setRequiredSkills(skills);
         return resp;
+    }
+    @Transactional
+    public ProjectResponse completeProject(Long projectId) {
+        Project project = projectRepo.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Project not found: " + projectId));
+    
+        project.setStatus(ProjectStatus.COMPLETED);
+        projectRepo.save(project);
+    
+        // Auto-generate portfolio entries for all accepted members
+        memberRepo.findByProjectIdAndStatus(projectId, MemberStatus.ACCEPTED)
+                .forEach(member ->
+                    portfolioService.autoGenerateForCompletedProject(
+                        projectId,
+                        member.getUserId(),
+                        member.getRole()
+                    )
+                );
+    
+        // Also create one for the project owner
+        portfolioService.autoGenerateForCompletedProject(
+            projectId,
+            project.getOwnerId(),
+            "Project Owner"
+        );
+    
+        return enrich(project);
     }
 }
