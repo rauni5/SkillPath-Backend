@@ -24,4 +24,7 @@ public class User {
  @CreationTimestamp
  @Column(name = "created_at", updatable = false)
  private Instant createdAt;
+ @Column(name = "is_admin", nullable = false)
+ @Builder.Default
+ private boolean admin = false;
 }
