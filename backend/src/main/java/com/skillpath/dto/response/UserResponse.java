@@ -13,6 +13,7 @@ public class UserResponse {
     private boolean availability;
     private String avatarUrl;
     private Instant createdAt;
+    private boolean admin;
     public static UserResponse from(User u) {
         return UserResponse.builder()
         .id(u.getId())
@@ -23,6 +24,7 @@ public class UserResponse {
         .availability(u.isAvailability())
         .avatarUrl(u.getAvatarUrl())
         .createdAt(u.getCreatedAt())
+        .admin(u.isAdmin())
         .build();
     }
 }

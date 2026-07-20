@@ -18,4 +18,7 @@ public class SkillTrieService implements ApplicationRunner {
     public List<String> autocomplete(String prefix) {
         return trie.searchByPrefix(prefix, 10);
     }
+    public void insertSkill(String name, Long skillId) {
+        trie.insert(name, skillId);
+    }
 }
