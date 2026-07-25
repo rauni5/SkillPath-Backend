@@ -5,13 +5,13 @@ services:
     plan: free
     region: singapore
     branch: main
-    autoDeploy: false          
+    autoDeploy: false
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /actuator/health
     envVars:
       - key: SPRING_DATASOURCE_URL
-        sync: false             
+        sync: false
       - key: SPRING_DATASOURCE_USERNAME
         sync: false
       - key: SPRING_DATASOURCE_PASSWORD
@@ -19,6 +19,12 @@ services:
       - key: FIREBASE_SERVICE_ACCOUNT
         sync: false
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
-        value: validate          
+        value: validate
       - key: SPRING_JPA_OPEN_IN_VIEW
         value: "false"
+      - key: SPRINGDOC_API_DOCS_ENABLED
+        value: "false"
+      - key: SPRINGDOC_SWAGGER_UI_ENABLED
+        value: "false"
+      - key: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+        value: health
