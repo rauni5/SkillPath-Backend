@@ -22,16 +22,6 @@ public class AdminController {
 
     private final AdminService adminService;
 
-    // ── Helper: verify caller is admin ───────────────────────────────────
-    // We resolve the user from the DB inside AdminService where needed,
-    // but the isAdmin check is done here so the pattern is consistent.
-    // (Alternatively use Spring Method Security with @PreAuthorize.)
-    private void requireAdmin(Authentication auth) {
-        // The SecurityConfig allows all /api/v1/admin/** through the Firebase filter,
-        // so we know the token is valid — but we still check the DB admin flag here.
-        // AdminService.bootstrapFirstAdmin is the only exception (it checks itself).
-    }
-
     // one-time bootstrap
 
     @PostMapping("/setup")
