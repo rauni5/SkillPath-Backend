@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url:      jdbc:postgresql://localhost:5432/skillpath
+    url:      jdbc:postgresql://pg-3e503547-raunit06-9fa2.a.aivencloud.com:20671/defaultdb?sslmode=require
     username: skillpath
     password: ${DB_PASSWORD}
     hikari:
@@ -22,7 +22,7 @@ spring:
 firebase:
   service-account: ${FIREBASE_SERVICE_ACCOUNT}
 server:
-  port: 8080
+  port: ${PORT:8080}
 springdoc:
   api-docs:
     path: /v3/api-docs
