@@ -9,6 +9,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -31,7 +33,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/swagger-ui/**", "/swagger-ui.html",
-                    "/v3/api-docs/**", "/scalar/**"
+                    "/v3/api-docs/**", "/scalar/**","/actuator/health/**"
                 ).permitAll()
                 .anyRequest().authenticated()
             )
@@ -43,5 +45,11 @@ public class SecurityConfig {
                 FirebaseTokenFilter.class);
  
         return http.build();
+    }
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> {
+            throw new UsernameNotFoundException("Authentication is handled by Firebase, not UserDetailsService");
+        };
     }
 }
