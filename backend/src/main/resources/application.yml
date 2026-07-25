@@ -36,4 +36,3 @@ logging:
     "[org.springframework]": WARN
     "[org.hibernate]": WARN
     "[org.flywaydb]": INFO
-spring.main.lazy-initialization: true
