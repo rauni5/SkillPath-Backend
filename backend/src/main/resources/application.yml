@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url:      jdbc:postgresql://pg-3e503547-raunit06-9fa2.a.aivencloud.com:20671/defaultdb?sslmode=require
+    url: jdbc:postgresql://localhost:5432/skillpath
     username: skillpath
     password: ${DB_PASSWORD}
     hikari:

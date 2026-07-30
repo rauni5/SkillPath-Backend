@@ -10,5 +10,6 @@ public interface ProjectMemberRepository
  List<ProjectMember> findByProjectIdAndStatus(Long projectId, MemberStatus
 status);
  List<ProjectMember> findByUserId(Long userId);
+ List<ProjectMember> findByUserIdAndStatus(Long userId, MemberStatus status);
  boolean existsByProjectIdAndUserId(Long projectId, Long userId);
 }

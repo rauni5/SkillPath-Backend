@@ -15,6 +15,6 @@ public class RoadmapController {
     }
     @PatchMapping("/api/v1/users/{userId}/roadmap/{stepId}")
     public ResponseEntity<ApiResponse<RoadmapStepResponse>> markDone(@PathVariable Long userId, @PathVariable Long stepId) {
-        return ResponseEntity.ok(ApiResponse.ok(roadmapService.markDone(stepId)));
+        return ResponseEntity.ok(ApiResponse.ok(roadmapService.markDone(userId, stepId)));
     }
 }

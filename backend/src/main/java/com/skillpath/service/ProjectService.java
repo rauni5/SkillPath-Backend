@@ -1,11 +1,13 @@
 package com.skillpath.service;
 import com.skillpath.dto.request.*;
 import com.skillpath.dto.response.*;
+import com.skillpath.exception.ForbiddenException;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.Project.Project;
 import com.skillpath.model.ProjectMember.ProjectMember;
 import com.skillpath.model.ProjectMember.ProjectMemberId;
 import com.skillpath.model.ProjectRequiredSkill.ProjectRequiredSkill;
+import com.skillpath.model.User.User;
 import com.skillpath.model.enums.*;
 import com.skillpath.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -19,13 +21,56 @@ public class ProjectService {
     private final ProjectRequiredSkillRepository reqSkillRepo;
     private final ProjectMemberRepository memberRepo;
     private final SkillRepository skillRepo;
+    private final UserRepository userRepo;
     private final PortfolioService portfolioService;
     public Page<ProjectResponse> browseOpen(Pageable pageable) {
         return projectRepo.findByStatus(ProjectStatus.OPEN, pageable).map(this::enrich);
     }
+    public Page<ProjectResponse> search(String difficulty, List<Long> skillIds, String q, Pageable pageable) {
+        String normalizedDifficulty = (difficulty == null || difficulty.isBlank())
+                ? null : difficulty.trim().toUpperCase();
+        List<Long> normalizedSkillIds = (skillIds == null || skillIds.isEmpty())
+                ? null : skillIds;
+        String normalizedQ = (q == null || q.isBlank()) ? null : q.trim();
+        return projectRepo.search(ProjectStatus.OPEN, normalizedDifficulty, normalizedSkillIds, normalizedQ, pageable)
+                .map(this::enrich);
+    }
     public ProjectResponse getById(Long id) {
         return enrich(projectRepo.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Project not found:"+id)));
+    }
+    public Page<ProjectResponse> getOwnedProjects(Long ownerId, Pageable pageable) {
+        return projectRepo.findByOwnerId(ownerId, pageable).map(this::enrich);
+    }
+    public void assertOwner(Long projectId, Long requesterId) {
+        requireOwner(projectId, requesterId);
+    }
+    private Project requireOwner(Long projectId, Long requesterId) {
+        Project project = projectRepo.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found:"+projectId));
+        if (!project.getOwnerId().equals(requesterId))
+            throw new ForbiddenException("Only the project owner can do this.");
+        return project;
+    }
+    public List<ProjectMemberResponse> getMembers(Long projectId, Long requesterId) {
+        requireOwner(projectId, requesterId);
+        return memberRepo.findByProjectId(projectId).stream()
+                .map(m -> {
+                    User u = userRepo.findById(m.getUserId()).orElseThrow();
+                    return ProjectMemberResponse.builder()
+                            .userId(u.getId())
+                            .name(u.getName())
+                            .avatarUrl(u.getAvatarUrl())
+                            .status(m.getStatus())
+                            .role(m.getRole())
+                            .build();
+                })
+                .toList();
+    }
+    @Transactional
+    public void removeMember(Long projectId, Long requesterId, Long targetUserId) {
+        requireOwner(projectId, requesterId);
+        memberRepo.deleteById(new ProjectMemberId(projectId, targetUserId));
     }
     @Transactional
     public ProjectResponse create(Long ownerId, CreateProjectRequest req) {
@@ -49,7 +94,8 @@ public class ProjectService {
                             .status(MemberStatus.PENDING).build());
     }
     @Transactional
-    public void updateMemberStatus(Long projectId, Long userId, UpdateMemberStatusRequest req) {
+    public void updateMemberStatus(Long projectId, Long requesterId, Long userId, UpdateMemberStatusRequest req) {
+        requireOwner(projectId, requesterId);
         ProjectMember m = memberRepo.findById(new ProjectMemberId(projectId, userId))
                                         .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
         m.setStatus(req.getStatus());

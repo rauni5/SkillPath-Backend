@@ -21,6 +21,7 @@ public class CareerGoalService {
     private final RoleRequiredSkillRepository roleSkillRepo;
     private final UserSkillRepository userSkillRepo;
     private final SkillRepository skillRepo;
+    private final RoadmapService roadmapService;
     @Transactional
     public void setGoal(Long userId, SetCareerGoalRequest req) {
         if (!roleRepo.existsById(req.getRoleId())) throw new ResourceNotFoundException("Role not found:"+req.getRoleId());
@@ -29,6 +30,7 @@ public class CareerGoalService {
         goal.setRoleId(req.getRoleId());
         goal.setSetAt(Instant.now());
         goalRepo.save(goal);
+        roadmapService.generateRoadmap(userId);
     }
     public GapAnalysisResponse getGapAnalysis(Long userId) {
         Long roleId = goalRepo.findRoleIdByUserId(userId)
