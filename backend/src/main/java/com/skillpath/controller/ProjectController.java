@@ -17,8 +17,14 @@ public class ProjectController {
     private final UserService userService;
     private final RecommendationService recommendationService;
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<ProjectResponse>>> browse(@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(projectService.browseOpen(PageRequest.of(page, size))));
+    public ResponseEntity<ApiResponse<Page<ProjectResponse>>> browse(
+            @RequestParam(defaultValue="0") int page,
+            @RequestParam(defaultValue="20") int size,
+            @RequestParam(required = false) String difficulty,
+            @RequestParam(required = false) List<Long> skillIds,
+            @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                projectService.search(difficulty, skillIds, q, PageRequest.of(page, size))));
     }
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProjectResponse>> get(@PathVariable Long id) {
@@ -26,24 +32,37 @@ public class ProjectController {
     }
     @PostMapping
     public ResponseEntity<ApiResponse<ProjectResponse>> create(Authentication auth, @Valid @RequestBody CreateProjectRequest req) {
-        FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
-        Long userId = userService.getEntityByFirebaseUid(p.getUid()).getId();
-        return ResponseEntity.ok(ApiResponse.ok(projectService.create(userId,req)));
+        return ResponseEntity.ok(ApiResponse.ok(projectService.create(currentUserId(auth),req)));
     }
     @PostMapping("/{id}/join")
     public ResponseEntity<ApiResponse<Void>> join(@PathVariable Long id, Authentication auth) {
-        FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
-        Long userId = userService.getEntityByFirebaseUid(p.getUid()).getId();
+        Long userId = currentUserId(auth);
         projectService.requestJoin(id, userId);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
     @PatchMapping("/{id}/members/{userId}")
-    public ResponseEntity<ApiResponse<Void>> updateMember(@PathVariable Long id, @PathVariable Long userId,@Valid @RequestBody UpdateMemberStatusRequest req) {
-        projectService.updateMemberStatus(id, userId, req);
+    public ResponseEntity<ApiResponse<Void>> updateMember(@PathVariable Long id, @PathVariable Long userId,
+            @Valid @RequestBody UpdateMemberStatusRequest req, Authentication auth) {
+        projectService.updateMemberStatus(id, currentUserId(auth), userId, req);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+    @GetMapping("/{id}/members")
+    public ResponseEntity<ApiResponse<List<ProjectMemberResponse>>> members(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.ok(projectService.getMembers(id, currentUserId(auth))));
+    }
+    @DeleteMapping("/{id}/members/{userId}")
+    public ResponseEntity<ApiResponse<Void>> removeMember(@PathVariable Long id, @PathVariable Long userId, Authentication auth) {
+        projectService.removeMember(id, currentUserId(auth), userId);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
     @GetMapping("/{id}/recommended-members")
-    public ResponseEntity<ApiResponse<List<MatchScoreResponse>>> recommended(@PathVariable Long id,@RequestParam(defaultValue = "5") int topN) {
+    public ResponseEntity<ApiResponse<List<MatchScoreResponse>>> recommended(
+            @PathVariable Long id, @RequestParam(defaultValue = "5") int topN, Authentication auth) {
+        projectService.assertOwner(id, currentUserId(auth));
         return ResponseEntity.ok(ApiResponse.ok(recommendationService.recommendTeammates(id, topN)));
+    }
+    private Long currentUserId(Authentication auth) {
+        FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
+        return userService.getEntityByFirebaseUid(p.getUid()).getId();
     }
 }
