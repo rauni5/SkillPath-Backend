@@ -14,7 +14,7 @@ public class DashboardService {
     private final SkillRepository skillRepo;
     public DashboardResponse getDashboard(Long userId) {
         // Career progress — 0% if no goal set
-        int progress = 0; String roleName = "";
+        int progress = 0; String roleName = null;
         try {
             GapAnalysisResponse gap = goalService.getGapAnalysis(userId);
             progress = gap.getProgressPercent();
@@ -33,7 +33,7 @@ public class DashboardService {
                                             .toList();
         // Active projects the user is accepted into
         List<ProjectResponse> active = memberRepo
-                                            .findByProjectIdAndStatus(userId, MemberStatus.ACCEPTED)
+                                            .findByUserIdAndStatus(userId, MemberStatus.ACCEPTED)
                                             .stream()
                                             .map(pm -> projectRepo.findById(pm.getProjectId())
                                             .map(ProjectResponse::from).orElseThrow())
