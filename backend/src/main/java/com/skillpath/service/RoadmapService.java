@@ -4,6 +4,9 @@ import com.skillpath.algorithm.graph.TopologicalSort;
 import com.skillpath.dto.response.RoadmapStepResponse;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.RoadmapStep.RoadmapStep;
+import com.skillpath.model.UserSkill.UserSkill;
+import com.skillpath.model.UserSkill.UserSkillId;
+import com.skillpath.model.enums.Proficiency;
 import com.skillpath.model.enums.StepStatus;
 import com.skillpath.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -54,11 +57,23 @@ public class RoadmapService {
         return toResponses(steps);
     }
     @Transactional
-    public RoadmapStepResponse markDone(Long stepId) {
+    public RoadmapStepResponse markDone(Long userId, Long stepId) {
         RoadmapStep step = stepRepo.findById(stepId)
         .orElseThrow(() -> new ResourceNotFoundException("Step not found:"+stepId));
+        if (!step.getUserId().equals(userId))
+            throw new ResourceNotFoundException("Step not found:"+stepId);
         step.setStatus(StepStatus.DONE);
         step.setCompletedAt(Instant.now());
+        // Completing a roadmap step means the user now knows this skill —
+        // add it to their profile (default Beginner) if they don't have it yet.
+        var skillId = new UserSkillId(userId, step.getSkillId());
+        if (!userSkillRepo.existsById(skillId)) {
+            userSkillRepo.save(UserSkill.builder()
+                .userId(userId)
+                .skillId(step.getSkillId())
+                .proficiency(Proficiency.BEGINNER)
+                .build());
+        }
         return toResponse(stepRepo.save(step));
     }
     private List<RoadmapStepResponse> toResponses(List<RoadmapStep> steps) {
