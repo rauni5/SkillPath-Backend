@@ -11,6 +11,10 @@ public class GlobalExceptionHandler {
  public ResponseEntity<ApiResponse<Void>> notFound(ResourceNotFoundException e) {
     return ResponseEntity.status(404).body(ApiResponse.error(e.getMessage()));
  }
+ @ExceptionHandler(ForbiddenException.class)
+ public ResponseEntity<ApiResponse<Void>> forbidden(ForbiddenException e) {
+    return ResponseEntity.status(403).body(ApiResponse.error(e.getMessage()));
+ }
  @ExceptionHandler(MethodArgumentNotValidException.class)
  public ResponseEntity<ApiResponse<Void>> validation(MethodArgumentNotValidException e) {
     String msg = e.getBindingResult().getFieldErrors().stream()
