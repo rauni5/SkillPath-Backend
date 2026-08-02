@@ -12,5 +12,7 @@ public class ProjectMember {
  @Column(length = 100) private String role;
  @Enumerated(EnumType.STRING) @Builder.Default
  private MemberStatus status = MemberStatus.PENDING;
+ @Column(name = "invited_by_owner") @Builder.Default
+ private boolean invitedByOwner = false;
  @Column(name = "joined_at") final private Instant joinedAt = Instant.now();
 }

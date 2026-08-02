@@ -3,7 +3,7 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 import java.util.Set;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
-public class CreateProjectRequest {
+public class UpdateProjectRequest {
     @NotBlank @Size(max = 200) private String name;
     private String description;
     private String difficulty;

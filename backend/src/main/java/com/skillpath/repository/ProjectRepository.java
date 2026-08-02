@@ -14,14 +14,17 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
  @Query("""
      SELECT DISTINCT p FROM Project p
      LEFT JOIN ProjectRequiredSkill prs ON prs.projectId = p.id
+     LEFT JOIN ProjectRequiredRole prr ON prr.projectId = p.id
      WHERE p.status = :status
      AND (:difficulty IS NULL OR p.difficulty = :difficulty)
      AND (:skillIds IS NULL OR prs.skillId IN :skillIds)
+     AND (:roleIds IS NULL OR prr.roleId IN :roleIds)
      AND (:q IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:q AS string), '%')))
      """)
  Page<Project> search(@Param("status") ProjectStatus status,
                        @Param("difficulty") String difficulty,
                        @Param("skillIds") List<Long> skillIds,
+                       @Param("roleIds") List<Long> roleIds,
                        @Param("q") String q,
                        Pageable pageable);
 }

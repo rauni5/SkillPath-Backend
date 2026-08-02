@@ -1,15 +1,22 @@
 package com.skillpath.controller;
 import com.skillpath.dto.ApiResponse;
+import com.skillpath.dto.request.UpdateMemberStatusRequest;
 import com.skillpath.dto.request.UpdateProfileRequest;
+import com.skillpath.dto.response.MembershipStatusResponse;
+import com.skillpath.dto.response.ProjectInviteResponse;
 import com.skillpath.dto.response.ProjectResponse;
 import com.skillpath.dto.response.UserResponse;
+import com.skillpath.exception.ForbiddenException;
+import com.skillpath.security.FirebasePrincipal;
 import com.skillpath.service.ProjectService;
 import com.skillpath.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 @RestController @RequestMapping("/api/v1/users") @RequiredArgsConstructor
 public class UserController {
@@ -29,5 +36,29 @@ public class UserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.ok(projectService.getOwnedProjects(id, PageRequest.of(page, size))));
+    }
+    @GetMapping("/{id}/invites")
+    public ResponseEntity<ApiResponse<List<ProjectInviteResponse>>> invites(@PathVariable Long id, Authentication auth) {
+        requireSelf(id, auth);
+        return ResponseEntity.ok(ApiResponse.ok(projectService.getMyInvites(id)));
+    }
+    @PatchMapping("/{id}/invites/{projectId}")
+    public ResponseEntity<ApiResponse<Void>> respondToInvite(
+            @PathVariable Long id, @PathVariable Long projectId,
+            @Valid @RequestBody UpdateMemberStatusRequest req, Authentication auth) {
+        requireSelf(id, auth);
+        projectService.respondToInvite(id, projectId, req);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+    @GetMapping("/{id}/memberships")
+    public ResponseEntity<ApiResponse<List<MembershipStatusResponse>>> memberships(@PathVariable Long id, Authentication auth) {
+        requireSelf(id, auth);
+        return ResponseEntity.ok(ApiResponse.ok(projectService.getMyMemberships(id)));
+    }
+    private void requireSelf(Long pathUserId, Authentication auth) {
+        FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
+        Long callerId = userService.getEntityByFirebaseUid(p.getUid()).getId();
+        if (!callerId.equals(pathUserId))
+            throw new ForbiddenException("You can only access your own data.");
     }
 }

@@ -56,6 +56,7 @@ CREATE TABLE projects (
  team_size INT,
  status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
  owner_id BIGINT REFERENCES users(id),
+ link VARCHAR(500),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE project_required_skills (
@@ -68,6 +69,7 @@ CREATE TABLE project_members (
  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  role VARCHAR(100),
  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+ invited_by_owner BOOLEAN NOT NULL DEFAULT FALSE,
  joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  PRIMARY KEY (project_id, user_id)
 );
@@ -87,6 +89,11 @@ CREATE TABLE portfolio_items (
  description TEXT,
  user_role VARCHAR(100),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE project_required_roles (
+ project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+ role_id BIGINT NOT NULL REFERENCES career_roles(id),
+ PRIMARY KEY (project_id, role_id)
 );
 CREATE INDEX idx_user_skills_user ON user_skills(user_id);
 CREATE INDEX idx_roadmap_user ON roadmap_steps(user_id);
