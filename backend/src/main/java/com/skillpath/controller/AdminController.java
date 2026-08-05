@@ -2,6 +2,7 @@ package com.skillpath.controller;
 
 import com.skillpath.dto.ApiResponse;
 import com.skillpath.dto.request.*;
+import com.skillpath.dto.response.RoleRequirementResponse;
 import com.skillpath.dto.response.SkillResponse;
 import com.skillpath.dto.response.UserResponse;
 import com.skillpath.model.CareerRole.CareerRole;
@@ -32,10 +33,25 @@ public class AdminController {
     }
 
     // SKILL MANAGEMENT
+    @GetMapping("/skills/{skillId}")
+    public ResponseEntity<ApiResponse<SkillResponse>> getSkill(@PathVariable Long skillId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getSkill(skillId)));
+    }
     @PostMapping("/skills")
     public ResponseEntity<ApiResponse<SkillResponse>> createSkill(
             @Valid @RequestBody CreateSkillRequest req) {
         return ResponseEntity.ok(ApiResponse.ok(adminService.createSkill(req)));
+    }
+    @PutMapping("/skills/{skillId}")
+    public ResponseEntity<ApiResponse<SkillResponse>> updateSkill(
+            @PathVariable Long skillId,
+            @Valid @RequestBody CreateSkillRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.updateSkill(skillId, req)));
+    }
+    @DeleteMapping("/skills/{skillId}")
+    public ResponseEntity<ApiResponse<Void>> deleteSkill(@PathVariable Long skillId) {
+        adminService.deleteSkill(skillId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
     @PostMapping("/skills/{skillId}/dependencies")
     public ResponseEntity<ApiResponse<Void>> addDependency(
@@ -61,10 +77,28 @@ public class AdminController {
 
 
     // CAREER ROLE MANAGEMENT
+    @GetMapping("/career-roles/{roleId}")
+    public ResponseEntity<ApiResponse<CareerRole>> getCareerRole(@PathVariable Long roleId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getCareerRole(roleId)));
+    }
+
     @PostMapping("/career-roles")
     public ResponseEntity<ApiResponse<CareerRole>> createCareerRole(
             @Valid @RequestBody CreateCareerRoleRequest req) {
         return ResponseEntity.ok(ApiResponse.ok(adminService.createCareerRole(req)));
+    }
+
+    @PutMapping("/career-roles/{roleId}")
+    public ResponseEntity<ApiResponse<CareerRole>> updateCareerRole(
+            @PathVariable Long roleId,
+            @Valid @RequestBody CreateCareerRoleRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.updateCareerRole(roleId, req)));
+    }
+
+    @DeleteMapping("/career-roles/{roleId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCareerRole(@PathVariable Long roleId) {
+        adminService.deleteCareerRole(roleId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
     @PostMapping("/career-roles/{roleId}/requirements")
@@ -72,6 +106,15 @@ public class AdminController {
             @PathVariable Long roleId,
             @Valid @RequestBody AddRequirementRequest req) {
         adminService.addRoleRequirement(roleId, req);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @PutMapping("/career-roles/{roleId}/requirements/{skillId}")
+    public ResponseEntity<ApiResponse<Void>> updateRequirement(
+            @PathVariable Long roleId,
+            @PathVariable Long skillId,
+            @Valid @RequestBody AddRequirementRequest req) {
+        adminService.updateRoleRequirement(roleId, skillId, req);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
@@ -85,7 +128,7 @@ public class AdminController {
 
 
     @GetMapping("/career-roles/{roleId}/requirements")
-    public ResponseEntity<ApiResponse<List<SkillResponse>>> getRequirements(
+    public ResponseEntity<ApiResponse<List<RoleRequirementResponse>>> getRequirements(
             @PathVariable Long roleId) {
         return ResponseEntity.ok(ApiResponse.ok(adminService.getRoleRequirements(roleId)));
     }
