@@ -1,6 +1,7 @@
 package com.skillpath.service;
 
 import com.skillpath.dto.request.*;
+import com.skillpath.dto.response.RoleRequirementResponse;
 import com.skillpath.dto.response.SkillResponse;
 import com.skillpath.dto.response.UserResponse;
 import com.skillpath.exception.ResourceNotFoundException;
@@ -31,6 +32,48 @@ public class AdminService {
     private final SkillTrieService            trieService;
 
     
+    public SkillResponse getSkill(Long skillId) {
+        return skillRepo.findById(skillId)
+                .map(SkillResponse::from)
+                .orElseThrow(() -> new ResourceNotFoundException("Skill not found: " + skillId));
+    }
+
+    @Transactional
+    public SkillResponse updateSkill(Long skillId, CreateSkillRequest req) {
+        Skill skill = skillRepo.findById(skillId)
+                .orElseThrow(() -> new ResourceNotFoundException("Skill not found: " + skillId));
+        boolean nameTaken = skillRepo.existsByNameIgnoreCase(req.getName())
+                && !skill.getName().equalsIgnoreCase(req.getName());
+        if (nameTaken)
+            throw new IllegalArgumentException(
+                "A skill named '" + req.getName() + "' already exists.");
+
+        skill.setName(req.getName());
+        skill.setCategory(req.getCategory());
+        skill.setDescription(req.getDescription());
+        Skill saved = skillRepo.save(skill);
+
+        // Best-effort: the live Trie only supports inserts, so a rename adds
+        // a new entry under the new name; the old name lingers until the
+        // next app restart (which rebuilds the Trie fresh from the DB).
+        trieService.insertSkill(saved.getName(), saved.getId());
+
+        return SkillResponse.from(saved);
+    }
+
+    @Transactional
+    public void deleteSkill(Long skillId) {
+        if (!skillRepo.existsById(skillId))
+            throw new ResourceNotFoundException("Skill not found: " + skillId);
+        try {
+            skillRepo.deleteById(skillId);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new IllegalStateException(
+                "Can't delete this skill — it's still required by at least one project. " +
+                "Remove it from those projects first.");
+        }
+    }
+
     @Transactional
     public SkillResponse createSkill(CreateSkillRequest req) {
         if (skillRepo.existsByNameIgnoreCase(req.getName()))
@@ -107,6 +150,39 @@ public class AdminService {
         return roleRepo.save(role);
     }
 
+    public CareerRole getCareerRole(Long roleId) {
+        return roleRepo.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Career role not found: " + roleId));
+    }
+
+    @Transactional
+    public CareerRole updateCareerRole(Long roleId, CreateCareerRoleRequest req) {
+        CareerRole role = roleRepo.findById(roleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Career role not found: " + roleId));
+        boolean nameTaken = roleRepo.findByName(req.getName())
+                .map(existing -> !existing.getId().equals(roleId))
+                .orElse(false);
+        if (nameTaken)
+            throw new IllegalArgumentException(
+                "A career role named '" + req.getName() + "' already exists.");
+        role.setName(req.getName());
+        role.setDescription(req.getDescription());
+        return roleRepo.save(role);
+    }
+
+    @Transactional
+    public void deleteCareerRole(Long roleId) {
+        if (!roleRepo.existsById(roleId))
+            throw new ResourceNotFoundException("Career role not found: " + roleId);
+        try {
+            roleRepo.deleteById(roleId);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new IllegalStateException(
+                "Can't delete this role — at least one user has it as their career goal, " +
+                "or a project currently requires it. Those must change first.");
+        }
+    }
+
     @Transactional
     public void addRoleRequirement(Long roleId, AddRequirementRequest req) {
         if (!roleRepo.existsById(roleId))
@@ -128,6 +204,16 @@ public class AdminService {
     }
 
     @Transactional
+    public void updateRoleRequirement(Long roleId, Long skillId, AddRequirementRequest req) {
+        RoleRequiredSkillId id = new RoleRequiredSkillId(roleId, skillId);
+        RoleRequiredSkill existing = roleSkillRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Requirement not found for role " + roleId + " / skill " + skillId));
+        existing.setImportance(req.getImportance());
+        roleSkillRepo.save(existing);
+    }
+
+    @Transactional
     public void removeRoleRequirement(Long roleId, Long skillId) {
         RoleRequiredSkillId id = new RoleRequiredSkillId(roleId, skillId);
         if (!roleSkillRepo.existsById(id))
@@ -136,12 +222,19 @@ public class AdminService {
         roleSkillRepo.deleteById(id);
     }
 
-    public List<SkillResponse> getRoleRequirements(Long roleId) {
+    public List<RoleRequirementResponse> getRoleRequirements(Long roleId) {
         if (!roleRepo.existsById(roleId))
             throw new ResourceNotFoundException("Career role not found: " + roleId);
         return roleSkillRepo.findByRoleId(roleId).stream()
-                .map(r -> skillRepo.findById(r.getSkillId())
-                        .map(SkillResponse::from).orElseThrow())
+                .map(r -> {
+                    Skill skill = skillRepo.findById(r.getSkillId()).orElseThrow();
+                    return RoleRequirementResponse.builder()
+                            .skillId(skill.getId())
+                            .name(skill.getName())
+                            .category(skill.getCategory().name())
+                            .importance(r.getImportance())
+                            .build();
+                })
                 .toList();
     }
 
