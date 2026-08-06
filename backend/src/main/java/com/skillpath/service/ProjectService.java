@@ -11,11 +11,13 @@ import com.skillpath.model.ProjectRequiredSkill.ProjectRequiredSkill;
 import com.skillpath.model.User.User;
 import com.skillpath.model.enums.*;
 import com.skillpath.repository.*;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Map;
 @Service @RequiredArgsConstructor
 public class ProjectService {
     private final ProjectRepository projectRepo;
@@ -26,6 +28,7 @@ public class ProjectService {
     private final SkillRepository skillRepo;
     private final UserRepository userRepo;
     private final PortfolioService portfolioService;
+    private final NotificationService notificationService;
     public Page<ProjectResponse> browseOpen(Pageable pageable) {
         return projectRepo.findByStatus(ProjectStatus.OPEN, pageable).map(this::enrich);
     }
@@ -179,19 +182,38 @@ public class ProjectService {
                             .userId(userId)
                             .status(MemberStatus.PENDING)
                             .invitedByOwner(false).build());
+
+        Project project = projectRepo.findById(projectId).orElseThrow();
+        User requester = userRepo.findById(userId).orElseThrow();
+        notificationService.notifyUser(
+                project.getOwnerId(),
+                "New join request",
+                requester.getName() + " wants to join \"" + project.getName() + "\"",
+                Map.of("type", NotificationType.JOIN_REQUEST_RECEIVED.getValue(),
+                       "projectId", String.valueOf(projectId)));
     }
     @Transactional
     public void updateMemberStatus(Long projectId, Long requesterId, Long userId, UpdateMemberStatusRequest req) {
-        requireOwner(projectId, requesterId);
+        Project project = requireOwner(projectId, requesterId);
         ProjectMember m = memberRepo.findById(new ProjectMemberId(projectId, userId))
                                         .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
         m.setStatus(req.getStatus());
         memberRepo.save(m);
+
+        if (req.getStatus() == MemberStatus.ACCEPTED || req.getStatus() == MemberStatus.REJECTED) {
+            boolean accepted = req.getStatus() == MemberStatus.ACCEPTED;
+            notificationService.notifyUser(
+                    userId,
+                    accepted ? "Request accepted" : "Request declined",
+                    "Your request to join \"" + project.getName() + "\" was " + (accepted ? "accepted" : "declined") + ".",
+                    Map.of("type", accepted ? NotificationType.JOIN_REQUEST_ACCEPTED.getValue() : NotificationType.JOIN_REQUEST_REJECTED.getValue(),
+                           "projectId", String.valueOf(projectId)));
+        }
     }
     // --- Owner-initiated invites ---
     @Transactional
     public void inviteMember(Long projectId, Long ownerId, Long targetUserId) {
-        requireOwner(projectId, ownerId);
+        Project project = requireOwner(projectId, ownerId);
         if (memberRepo.existsByProjectIdAndUserId(projectId, targetUserId))
             throw new IllegalStateException("This person already has a pending request, invite, or membership on this project.");
         memberRepo.save(ProjectMember.builder()
@@ -199,6 +221,13 @@ public class ProjectService {
                             .userId(targetUserId)
                             .status(MemberStatus.PENDING)
                             .invitedByOwner(true).build());
+
+        notificationService.notifyUser(
+                targetUserId,
+                "New project invite",
+                "You've been invited to join \"" + project.getName() + "\"",
+                Map.of("type", NotificationType.INVITE_RECEIVED.getValue(),
+                       "projectId", String.valueOf(projectId)));
     }
     public List<ProjectInviteResponse> getMyInvites(Long userId) {
         return memberRepo.findByUserId(userId).stream()
@@ -224,6 +253,18 @@ public class ProjectService {
             throw new ForbiddenException("You can only respond to your own invites.");
         m.setStatus(req.getStatus());
         memberRepo.save(m);
+
+        if (req.getStatus() == MemberStatus.ACCEPTED || req.getStatus() == MemberStatus.REJECTED) {
+            boolean accepted = req.getStatus() == MemberStatus.ACCEPTED;
+            Project project = projectRepo.findById(projectId).orElseThrow();
+            User invitee = userRepo.findById(userId).orElseThrow();
+            notificationService.notifyUser(
+                    project.getOwnerId(),
+                    accepted ? "Invite accepted" : "Invite declined",
+                    invitee.getName() + " " + (accepted ? "accepted" : "declined") + " your invite to \"" + project.getName() + "\"",
+                    Map.of("type", accepted ? NotificationType.INVITE_ACCEPTED.getValue() : NotificationType.INVITE_REJECTED.getValue(),
+                           "projectId", String.valueOf(projectId)));
+        }
     }
     // --- Status-change alerts ---
     /** All of this user's own join requests/invites (any status) — used client-side
