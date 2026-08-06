@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 @Service
+@Slf4j
 public class NotificationService {
 
     private final ObjectProvider<FirebaseApp> firebaseAppProvider;
@@ -29,6 +30,7 @@ public class NotificationService {
 
         FirebaseApp app = firebaseAppProvider.getIfAvailable();
         if (app == null) {
+            log.warn("Push notification skipped for user {} - Firebase is not configured", userId);
             return;
         }
 
@@ -63,11 +65,14 @@ public class NotificationService {
             } catch (FirebaseMessagingException e) {
                 if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED
                         || e.getMessagingErrorCode() == MessagingErrorCode.INVALID_ARGUMENT) {
-                    // Token is stale - stop trying it.
+                    // Token is stale (app uninstalled, etc) - stop trying it.
                     deviceTokenRepo.deleteByToken(deviceToken.getToken());
+                } else {
+                    log.warn("Push notification failed for user {}: {}", userId, e.getMessage());
                 }
             } catch (Exception e) {
-                    return;
+                //never let a notification failure surface past this method.
+                log.warn("Unexpected error sending push notification to user {}", userId, e);
             }
         }
     }
