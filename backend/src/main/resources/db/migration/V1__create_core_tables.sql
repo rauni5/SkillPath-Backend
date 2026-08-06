@@ -95,6 +95,15 @@ CREATE TABLE project_required_roles (
  role_id BIGINT NOT NULL REFERENCES career_roles(id),
  PRIMARY KEY (project_id, role_id)
 );
+CREATE TABLE user_device_tokens (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ token VARCHAR(255) UNIQUE NOT NULL,
+ platform VARCHAR(20) NOT NULL DEFAULT 'UNKNOWN',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_user_device_tokens_user_id ON user_device_tokens(user_id);
 CREATE INDEX idx_user_skills_user ON user_skills(user_id);
 CREATE INDEX idx_roadmap_user ON roadmap_steps(user_id);
 CREATE INDEX idx_project_status ON projects(status);
