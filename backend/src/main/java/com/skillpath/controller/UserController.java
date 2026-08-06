@@ -1,5 +1,6 @@
 package com.skillpath.controller;
 import com.skillpath.dto.ApiResponse;
+import com.skillpath.dto.request.RegisterDeviceTokenRequest;
 import com.skillpath.dto.request.UpdateMemberStatusRequest;
 import com.skillpath.dto.request.UpdateProfileRequest;
 import com.skillpath.dto.response.MembershipStatusResponse;
@@ -54,6 +55,20 @@ public class UserController {
     public ResponseEntity<ApiResponse<List<MembershipStatusResponse>>> memberships(@PathVariable Long id, Authentication auth) {
         requireSelf(id, auth);
         return ResponseEntity.ok(ApiResponse.ok(projectService.getMyMemberships(id)));
+    }
+    @PutMapping("/{id}/device-token")
+    public ResponseEntity<ApiResponse<Void>> registerDeviceToken(
+            @PathVariable Long id, @Valid @RequestBody RegisterDeviceTokenRequest req, Authentication auth) {
+        requireSelf(id, auth);
+        userService.registerDeviceToken(id, req);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+    @DeleteMapping("/{id}/device-token")
+    public ResponseEntity<ApiResponse<Void>> unregisterDeviceToken(
+            @PathVariable Long id, @RequestParam String token, Authentication auth) {
+        requireSelf(id, auth);
+        userService.unregisterDeviceToken(token);
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
     private void requireSelf(Long pathUserId, Authentication auth) {
         FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
