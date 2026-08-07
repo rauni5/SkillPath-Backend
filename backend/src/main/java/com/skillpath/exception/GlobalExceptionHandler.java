@@ -15,6 +15,10 @@ public class GlobalExceptionHandler {
  public ResponseEntity<ApiResponse<Void>> forbidden(ForbiddenException e) {
     return ResponseEntity.status(403).body(ApiResponse.error(e.getMessage()));
  }
+ @ExceptionHandler(AiServiceException.class)
+ public ResponseEntity<ApiResponse<Void>> aiService(AiServiceException e) {
+    return ResponseEntity.status(502).body(ApiResponse.error(e.getMessage()));
+ }
  @ExceptionHandler(MethodArgumentNotValidException.class)
  public ResponseEntity<ApiResponse<Void>> validation(MethodArgumentNotValidException e) {
     String msg = e.getBindingResult().getFieldErrors().stream()

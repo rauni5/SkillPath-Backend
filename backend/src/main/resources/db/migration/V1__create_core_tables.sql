@@ -103,6 +103,27 @@ CREATE TABLE user_device_tokens (
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE TABLE chat_messages (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+ role VARCHAR(10) NOT NULL CHECK (role IN ('USER','ASSISTANT')),
+ content TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE skill_check_attempts (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+ questions_json TEXT NOT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'GENERATED' CHECK (status IN ('GENERATED','SUBMITTED')),
+ score INT,
+ proficiency VARCHAR(20) CHECK (proficiency IN ('BEGINNER','INTERMEDIATE','ADVANCED')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ submitted_at TIMESTAMPTZ
+);
+CREATE INDEX idx_chat_messages_user_skill ON chat_messages(user_id, skill_id, created_at);
+CREATE INDEX idx_skill_check_attempts_user_skill ON skill_check_attempts(user_id, skill_id);
 CREATE INDEX idx_user_device_tokens_user_id ON user_device_tokens(user_id);
 CREATE INDEX idx_user_skills_user ON user_skills(user_id);
 CREATE INDEX idx_roadmap_user ON roadmap_steps(user_id);
