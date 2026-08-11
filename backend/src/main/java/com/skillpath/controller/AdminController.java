@@ -2,6 +2,8 @@ package com.skillpath.controller;
 
 import com.skillpath.dto.ApiResponse;
 import com.skillpath.dto.request.*;
+import com.skillpath.dto.response.AchievementDeletionResult;
+import com.skillpath.dto.response.AdminAchievementResponse;
 import com.skillpath.dto.response.RoleRequirementResponse;
 import com.skillpath.dto.response.SkillResponse;
 import com.skillpath.dto.response.UserResponse;
@@ -145,5 +147,36 @@ public class AdminController {
             @RequestBody java.util.Map<String, Boolean> body) {
         boolean isAdmin = Boolean.TRUE.equals(body.get("admin"));
         return ResponseEntity.ok(ApiResponse.ok(adminService.setAdminFlag(userId, isAdmin)));
+    }
+
+    // ACHIEVEMENT MANAGEMENT
+    @GetMapping("/achievements")
+    public ResponseEntity<ApiResponse<List<AdminAchievementResponse>>> listAchievements() {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.listAchievements()));
+    }
+
+    @GetMapping("/achievements/{achievementId}")
+    public ResponseEntity<ApiResponse<AdminAchievementResponse>> getAchievement(
+            @PathVariable Long achievementId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getAchievementAdmin(achievementId)));
+    }
+
+    @PostMapping("/achievements")
+    public ResponseEntity<ApiResponse<AdminAchievementResponse>> createAchievement(
+            @Valid @RequestBody CreateAchievementRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.createAchievement(req)));
+    }
+
+    @PutMapping("/achievements/{achievementId}")
+    public ResponseEntity<ApiResponse<AdminAchievementResponse>> updateAchievement(
+            @PathVariable Long achievementId,
+            @Valid @RequestBody UpdateAchievementRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.updateAchievement(achievementId, req)));
+    }
+
+    @DeleteMapping("/achievements/{achievementId}")
+    public ResponseEntity<ApiResponse<AchievementDeletionResult>> deleteAchievement(
+            @PathVariable Long achievementId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.deleteAchievement(achievementId)));
     }
 }
