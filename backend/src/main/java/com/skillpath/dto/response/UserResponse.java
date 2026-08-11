@@ -8,6 +8,11 @@ public class UserResponse {
     private Long id;
     private String name;
     private String email;
+    private String phoneNumber;
+    private String githubUrl;
+    private String linkedinUrl;
+    private String location;
+    private String softSkills;
     private String bio;
     private Proficiency experienceLevel;
     private boolean availability;
@@ -19,6 +24,11 @@ public class UserResponse {
         .id(u.getId())
         .name(u.getName())
         .email(u.getEmail())
+        .phoneNumber(u.getPhoneNumber())
+        .githubUrl(u.getGithubUrl())
+        .linkedinUrl(u.getLinkedinUrl())
+        .location(u.getLocation())
+        .softSkills(u.getSoftSkills())
         .bio(u.getBio())
         .experienceLevel(u.getExperienceLevel())
         .availability(u.isAvailability())
