@@ -122,6 +122,51 @@ CREATE TABLE skill_check_attempts (
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  submitted_at TIMESTAMPTZ
 );
+CREATE TABLE dashboard_summaries (
+ user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ content TEXT NOT NULL,
+ generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE roadmap_chat_sessions (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ title VARCHAR(120),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE roadmap_chat_messages (
+ id BIGSERIAL PRIMARY KEY,
+ session_id BIGINT NOT NULL REFERENCES roadmap_chat_sessions(id) ON DELETE CASCADE,
+ role VARCHAR(10) NOT NULL CHECK (role IN ('USER','ASSISTANT')),
+ content TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE achievements (
+ id BIGSERIAL PRIMARY KEY,
+ code VARCHAR(50) UNIQUE NOT NULL,
+ title VARCHAR(100) NOT NULL,
+ description VARCHAR(255) NOT NULL,
+ icon VARCHAR(50) NOT NULL,
+ category VARCHAR(30) NOT NULL,
+ criteria_type VARCHAR(40) NOT NULL DEFAULT 'ROADMAP_STEPS_COMPLETED',
+ criteria_value INT NOT NULL DEFAULT 1,
+ enabled BOOLEAN NOT NULL DEFAULT TRUE;
+);
+CREATE TABLE user_achievements (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ achievement_id BIGINT NOT NULL REFERENCES achievements(id) ON DELETE CASCADE,
+ unlocked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE (user_id, achievement_id)
+);
+CREATE TABLE user_streaks (
+ user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ current_streak INT NOT NULL DEFAULT 0,
+ longest_streak INT NOT NULL DEFAULT 0,
+ last_activity_date DATE
+);
+CREATE INDEX idx_user_achievements_user ON user_achievements(user_id);
+CREATE INDEX idx_roadmap_chat_sessions_user ON roadmap_chat_sessions(user_id, created_at);
+CREATE INDEX idx_roadmap_chat_messages_session ON roadmap_chat_messages(session_id, created_at);
 CREATE INDEX idx_chat_messages_user_skill ON chat_messages(user_id, skill_id, created_at);
 CREATE INDEX idx_skill_check_attempts_user_skill ON skill_check_attempts(user_id, skill_id);
 CREATE INDEX idx_user_device_tokens_user_id ON user_device_tokens(user_id);
