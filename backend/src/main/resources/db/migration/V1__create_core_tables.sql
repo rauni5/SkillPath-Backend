@@ -4,10 +4,15 @@ CREATE TABLE users (
  email VARCHAR(255),
  name VARCHAR(120),
  bio TEXT,
+ phone_number VARCHAR(30),
+ location VARCHAR(255),
+ soft_skills TEXT,
  experience_level VARCHAR(20) CHECK (experience_level IN
 ('BEGINNER','INTERMEDIATE','ADVANCED')),
  availability BOOLEAN NOT NULL DEFAULT TRUE,
  avatar_url VARCHAR(500),
+ github_url VARCHAR(255),
+ linkedin_url VARCHAR(255),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  is_admin BOOLEAN NOT NULL DEFAULT FALSE
 );
@@ -167,6 +172,16 @@ CREATE TABLE user_streaks (
 CREATE INDEX idx_user_achievements_user ON user_achievements(user_id);
 CREATE INDEX idx_roadmap_chat_sessions_user ON roadmap_chat_sessions(user_id, created_at);
 CREATE INDEX idx_roadmap_chat_messages_session ON roadmap_chat_messages(session_id, created_at);
+CREATE TABLE certifications (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ name VARCHAR(200) NOT NULL,
+ issuer VARCHAR(200),
+ credential_url VARCHAR(500),
+ earned_on DATE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_certifications_user_id ON certifications(user_id);
 CREATE INDEX idx_chat_messages_user_skill ON chat_messages(user_id, skill_id, created_at);
 CREATE INDEX idx_skill_check_attempts_user_skill ON skill_check_attempts(user_id, skill_id);
 CREATE INDEX idx_user_device_tokens_user_id ON user_device_tokens(user_id);
