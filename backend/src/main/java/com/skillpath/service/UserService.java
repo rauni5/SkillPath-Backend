@@ -32,6 +32,11 @@ public class UserService {
     public UserResponse updateProfile(Long userId, UpdateProfileRequest req) {
         User user = getEntityById(userId);
         if (req.getName() != null) user.setName(req.getName());
+        if (req.getPhoneNumber() != null) user.setPhoneNumber(req.getPhoneNumber());
+        if (req.getGithubUrl() != null) user.setGithubUrl(req.getGithubUrl());
+        if (req.getLinkedinUrl() != null) user.setLinkedinUrl(req.getLinkedinUrl());
+        if (req.getLocation() != null) user.setLocation(req.getLocation());
+        if (req.getSoftSkills() != null) user.setSoftSkills(req.getSoftSkills());
         if (req.getBio() != null) user.setBio(req.getBio());
         if (req.getExperienceLevel() != null) user.setExperienceLevel(req.getExperienceLevel());
         if (req.getAvailability() != null) user.setAvailability(req.getAvailability());

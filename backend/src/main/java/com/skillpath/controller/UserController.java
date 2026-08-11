@@ -1,14 +1,20 @@
 package com.skillpath.controller;
 import com.skillpath.dto.ApiResponse;
+import com.skillpath.dto.request.AddCertificationRequest;
+import com.skillpath.dto.request.AddPortfolioItemRequest;
 import com.skillpath.dto.request.RegisterDeviceTokenRequest;
 import com.skillpath.dto.request.UpdateMemberStatusRequest;
 import com.skillpath.dto.request.UpdateProfileRequest;
+import com.skillpath.dto.response.CertificationResponse;
 import com.skillpath.dto.response.MembershipStatusResponse;
+import com.skillpath.dto.response.PortfolioItemResponse;
+import com.skillpath.dto.response.PortfolioResponse;
 import com.skillpath.dto.response.ProjectInviteResponse;
 import com.skillpath.dto.response.ProjectResponse;
 import com.skillpath.dto.response.UserResponse;
 import com.skillpath.exception.ForbiddenException;
 import com.skillpath.security.FirebasePrincipal;
+import com.skillpath.service.PortfolioService;
 import com.skillpath.service.ProjectService;
 import com.skillpath.service.UserService;
 import jakarta.validation.Valid;
@@ -23,13 +29,47 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
     private final UserService userService;
     private final ProjectService projectService;
+    private final PortfolioService portfolioService;
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(userService.findById(id)));
     }
+    @GetMapping("/{id}/portfolio")
+    public ResponseEntity<ApiResponse<PortfolioResponse>> portfolio(@PathVariable Long id, Authentication auth) {
+        requireSelf(id, auth);
+        return ResponseEntity.ok(ApiResponse.ok(portfolioService.getSummary(id)));
+    }
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<UserResponse>> updateUser(@PathVariable Long id, @Valid @RequestBody UpdateProfileRequest req) {
+    public ResponseEntity<ApiResponse<UserResponse>> updateUser(
+            @PathVariable Long id, @Valid @RequestBody UpdateProfileRequest req, Authentication auth) {
+        requireSelf(id, auth);
         return ResponseEntity.ok(ApiResponse.ok(userService.updateProfile(id,req)));
+    }
+    @PostMapping("/{id}/portfolio")
+    public ResponseEntity<ApiResponse<PortfolioItemResponse>> addPortfolioItem(
+            @PathVariable Long id, @Valid @RequestBody AddPortfolioItemRequest req, Authentication auth) {
+        requireSelf(id, auth);
+        return ResponseEntity.ok(ApiResponse.ok(portfolioService.addItem(id, req)));
+    }
+    @DeleteMapping("/{id}/portfolio/{itemId}")
+    public ResponseEntity<ApiResponse<Void>> deletePortfolioItem(
+            @PathVariable Long id, @PathVariable Long itemId, Authentication auth) {
+        requireSelf(id, auth);
+        portfolioService.deleteItem(id, itemId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+    @PostMapping("/{id}/certifications")
+    public ResponseEntity<ApiResponse<CertificationResponse>> addCertification(
+            @PathVariable Long id, @Valid @RequestBody AddCertificationRequest req, Authentication auth) {
+        requireSelf(id, auth);
+        return ResponseEntity.ok(ApiResponse.ok(portfolioService.addCertification(id, req)));
+    }
+    @DeleteMapping("/{id}/certifications/{certId}")
+    public ResponseEntity<ApiResponse<Void>> deleteCertification(
+            @PathVariable Long id, @PathVariable Long certId, Authentication auth) {
+        requireSelf(id, auth);
+        portfolioService.deleteCertification(id, certId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
     @GetMapping("/{id}/projects")
     public ResponseEntity<ApiResponse<Page<ProjectResponse>>> ownedProjects(
