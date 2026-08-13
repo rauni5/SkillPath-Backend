@@ -4,6 +4,7 @@ import com.skillpath.algorithm.graph.TopologicalSort;
 import com.skillpath.dto.response.RoadmapStepResponse;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.RoadmapStep.RoadmapStep;
+import com.skillpath.model.UserCareerGoal.UserCareerGoal;
 import com.skillpath.model.UserSkill.UserSkill;
 import com.skillpath.model.UserSkill.UserSkillId;
 import com.skillpath.model.enums.Proficiency;
@@ -19,7 +20,7 @@ public class RoadmapService {
     private final SkillDependencyRepository depRepo;
     private final UserSkillRepository userSkillRepo;
     private final UserCareerGoalRepository goalRepo;
-    private final RoleRequiredSkillRepository roleSkillRepo;
+    private final BranchRequiredSkillRepository branchSkillRepo;
     private final RoadmapStepRepository stepRepo;
     private final SkillRepository skillRepo;
     @Transactional
@@ -33,9 +34,13 @@ public class RoadmapService {
         });
         // 2. Load what the user already knows
         Set<Long> userSkills = userSkillRepo.findSkillIdsByUserId(userId);
-        // 3. Load what the target role requires
-        Long roleId = goalRepo.findRoleIdByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("No career goal set for user: " + userId));
-        Set<Long> required = roleSkillRepo.findSkillIdsByRoleId(roleId);
+        // 3. Load what the selected branch requires
+        UserCareerGoal goal = goalRepo.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("No career goal set for user: " + userId));
+        if (goal.getBranchId() == null)
+            throw new IllegalStateException(
+                "This career goal has no branch selected yet — choose a branch before generating a roadmap.");
+        Set<Long> required = branchSkillRepo.findSkillIdsByBranchId(goal.getBranchId());
         // 4. Find every skill still needed (including transitive prerequisites)
         Set<Long> missing = graph.getMissingSkills(userSkills, required);
         // 5. Topological sort — valid learning sequence
