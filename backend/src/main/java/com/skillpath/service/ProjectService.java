@@ -153,8 +153,6 @@ public class ProjectService {
                             .status(MemberStatus.ACCEPTED)
                             .role("Owner")
                             .invitedByOwner(false).build());
-        // Seed the public board so the discussion never opens empty.
-        discussionService.createAboutPost(p.getId(), ownerId, p.getName(), p.getDescription());
         return enrich(p);
     }
     @Transactional
