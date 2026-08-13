@@ -2,12 +2,15 @@ package com.skillpath.service;
 import com.skillpath.dto.request.RegisterDeviceTokenRequest;
 import com.skillpath.dto.request.UpdateProfileRequest;
 import com.skillpath.dto.response.UserResponse;
+import com.skillpath.dto.response.UserSearchResultResponse;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.User.User;
 import com.skillpath.model.UserDeviceToken.UserDeviceToken;
 import com.skillpath.repository.UserDeviceTokenRepository;
 import com.skillpath.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 @Service @RequiredArgsConstructor
@@ -18,6 +21,10 @@ public class UserService {
         return userRepo.findById(userId)
                     .map(UserResponse::from)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+    }
+    public Page<UserSearchResultResponse> search(String q, Pageable pageable) {
+        return userRepo.searchByNameOrEmail(q.trim(), pageable)
+                .map(UserSearchResultResponse::from);
     }
     // Returns the raw entity — used by other services internally
     public User getEntityById(Long userId) {
