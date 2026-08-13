@@ -42,9 +42,17 @@ CREATE TABLE role_required_skills (
  importance INT NOT NULL CHECK (importance BETWEEN 1 AND 10),
  PRIMARY KEY (role_id, skill_id)
 );
+CREATE TABLE role_branches (
+ id BIGSERIAL PRIMARY KEY,
+ role_id BIGINT NOT NULL REFERENCES career_roles(id) ON DELETE CASCADE,
+ name VARCHAR(100) NOT NULL,
+ description TEXT,
+ UNIQUE(role_id, name)
+);
 CREATE TABLE user_career_goals (
  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
  role_id BIGINT NOT NULL REFERENCES career_roles(id),
+ branch_id BIGINT REFERENCES role_branches(id),
  set_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE projects (
@@ -121,6 +129,12 @@ CREATE TABLE skill_check_attempts (
  proficiency VARCHAR(20) CHECK (proficiency IN ('BEGINNER','INTERMEDIATE','ADVANCED')),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  submitted_at TIMESTAMPTZ
+);
+CREATE TABLE branch_required_skills (
+ branch_id BIGINT NOT NULL REFERENCES role_branches(id) ON DELETE CASCADE,
+ skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+ importance INT NOT NULL CHECK (importance BETWEEN 1 AND 10),
+ PRIMARY KEY (branch_id, skill_id)
 );
 CREATE INDEX idx_chat_messages_user_skill ON chat_messages(user_id, skill_id, created_at);
 CREATE INDEX idx_skill_check_attempts_user_skill ON skill_check_attempts(user_id, skill_id);
