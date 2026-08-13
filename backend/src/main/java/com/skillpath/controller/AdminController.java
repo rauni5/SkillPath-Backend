@@ -3,6 +3,9 @@ package com.skillpath.controller;
 import com.skillpath.dto.ApiResponse;
 import com.skillpath.dto.request.*;
 import com.skillpath.dto.response.BranchRequirementResponse;
+import com.skillpath.dto.response.AchievementDeletionResult;
+import com.skillpath.dto.response.AdminAchievementResponse;
+import com.skillpath.dto.response.RoleRequirementResponse;
 import com.skillpath.dto.response.SkillResponse;
 import com.skillpath.dto.response.UserResponse;
 import com.skillpath.model.CareerRole.CareerRole;
@@ -172,5 +175,34 @@ public class AdminController {
     public ResponseEntity<ApiResponse<UserResponse>> bootstrap(Authentication auth) {
         FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
         return ResponseEntity.ok(ApiResponse.ok(adminService.bootstrapFirstAdmin(p.getUid())));
+    // ACHIEVEMENT MANAGEMENT
+    @GetMapping("/achievements")
+    public ResponseEntity<ApiResponse<List<AdminAchievementResponse>>> listAchievements() {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.listAchievements()));
+    }
+
+    @GetMapping("/achievements/{achievementId}")
+    public ResponseEntity<ApiResponse<AdminAchievementResponse>> getAchievement(
+            @PathVariable Long achievementId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getAchievementAdmin(achievementId)));
+    }
+
+    @PostMapping("/achievements")
+    public ResponseEntity<ApiResponse<AdminAchievementResponse>> createAchievement(
+            @Valid @RequestBody CreateAchievementRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.createAchievement(req)));
+    }
+
+    @PutMapping("/achievements/{achievementId}")
+    public ResponseEntity<ApiResponse<AdminAchievementResponse>> updateAchievement(
+            @PathVariable Long achievementId,
+            @Valid @RequestBody UpdateAchievementRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.updateAchievement(achievementId, req)));
+    }
+
+    @DeleteMapping("/achievements/{achievementId}")
+    public ResponseEntity<ApiResponse<AchievementDeletionResult>> deleteAchievement(
+            @PathVariable Long achievementId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.deleteAchievement(achievementId)));
     }
 }

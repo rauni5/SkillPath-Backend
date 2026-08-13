@@ -29,6 +29,7 @@ public class ProjectService {
     private final UserRepository userRepo;
     private final PortfolioService portfolioService;
     private final NotificationService notificationService;
+    private final ProjectDiscussionService discussionService;
     public Page<ProjectResponse> browseOpen(Pageable pageable) {
         return projectRepo.findByStatus(ProjectStatus.OPEN, pageable).map(this::enrich);
     }

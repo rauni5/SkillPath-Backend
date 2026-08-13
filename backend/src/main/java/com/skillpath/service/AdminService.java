@@ -7,6 +7,13 @@ import com.skillpath.dto.response.UserResponse;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.BranchRequiredSkill.BranchRequiredSkill;
 import com.skillpath.model.BranchRequiredSkill.BranchRequiredSkillId;
+import com.skillpath.dto.response.AchievementDeletionResult;
+import com.skillpath.dto.response.AdminAchievementResponse;
+import com.skillpath.dto.response.RoleRequirementResponse;
+import com.skillpath.dto.response.SkillResponse;
+import com.skillpath.dto.response.UserResponse;
+import com.skillpath.exception.ResourceNotFoundException;
+import com.skillpath.model.Achievement.Achievement;
 import com.skillpath.model.CareerRole.CareerRole;
 import com.skillpath.model.RoleBranch.RoleBranch;
 import com.skillpath.model.Skill.Skill;
@@ -32,6 +39,8 @@ public class AdminService {
     private final BranchRequiredSkillRepository branchSkillRepo;
     private final UserRepository              userRepo;
     private final SkillTrieService            trieService;
+    private final AchievementRepository       achievementRepo;
+    private final UserAchievementRepository   userAchievementRepo;
 
     // SKILL MANAGEMENT
     @Transactional
@@ -325,6 +334,85 @@ public class AdminService {
         return UserResponse.from(userRepo.save(user));
     }
 
+
+    // ACHIEVEMENT MANAGEMENT
+
+    public List<AdminAchievementResponse> listAchievements() {
+        return achievementRepo.findAll().stream()
+                .map(a -> AdminAchievementResponse.from(a, userAchievementRepo.countByAchievementId(a.getId())))
+                .toList();
+    }
+
+    public AdminAchievementResponse getAchievementAdmin(Long achievementId) {
+        Achievement a = achievementRepo.findById(achievementId)
+                .orElseThrow(() -> new ResourceNotFoundException("Achievement not found: " + achievementId));
+        return AdminAchievementResponse.from(a, userAchievementRepo.countByAchievementId(a.getId()));
+    }
+
+    @Transactional
+    public AdminAchievementResponse createAchievement(CreateAchievementRequest req) {
+        String code = req.getCode().trim().toUpperCase();
+        if (achievementRepo.existsByCodeIgnoreCase(code))
+            throw new IllegalArgumentException(
+                "An achievement with code '" + code + "' already exists.");
+
+        Achievement achievement = Achievement.builder()
+                .code(code)
+                .title(req.getTitle().trim())
+                .description(req.getDescription().trim())
+                .icon(req.getIcon().trim())
+                .category(req.getCategory().trim())
+                .criteriaType(req.getCriteriaType())
+                .criteriaValue(req.getCriteriaValue())
+                .enabled(true)
+                .build();
+        Achievement saved = achievementRepo.save(achievement);
+        return AdminAchievementResponse.from(saved, 0);
+    }
+
+    @Transactional
+    public AdminAchievementResponse updateAchievement(Long achievementId, UpdateAchievementRequest req) {
+        Achievement achievement = achievementRepo.findById(achievementId)
+                .orElseThrow(() -> new ResourceNotFoundException("Achievement not found: " + achievementId));
+
+        achievement.setTitle(req.getTitle().trim());
+        achievement.setDescription(req.getDescription().trim());
+        achievement.setIcon(req.getIcon().trim());
+        achievement.setCategory(req.getCategory().trim());
+        achievement.setCriteriaType(req.getCriteriaType());
+        achievement.setCriteriaValue(req.getCriteriaValue());
+        achievement.setEnabled(req.getEnabled());
+        Achievement saved = achievementRepo.save(achievement);
+        return AdminAchievementResponse.from(saved, userAchievementRepo.countByAchievementId(achievementId));
+    }
+
+    /** Hard-deletes an achievement no one has earned yet. If at least one
+     *  user already unlocked it, disables it instead so their badge stays
+     *  intact — it just stops being obtainable by anyone else. */
+    @Transactional
+    public AchievementDeletionResult deleteAchievement(Long achievementId) {
+        Achievement achievement = achievementRepo.findById(achievementId)
+                .orElseThrow(() -> new ResourceNotFoundException("Achievement not found: " + achievementId));
+
+        if (userAchievementRepo.existsByAchievementId(achievementId)) {
+            achievement.setEnabled(false);
+            Achievement saved = achievementRepo.save(achievement);
+            long count = userAchievementRepo.countByAchievementId(achievementId);
+            return AchievementDeletionResult.builder()
+                    .deleted(false)
+                    .message("Users have already earned this achievement, so it was disabled " +
+                            "instead of deleted — it's now hidden from anyone who hasn't unlocked it.")
+                    .achievement(AdminAchievementResponse.from(saved, count))
+                    .build();
+        }
+
+        achievementRepo.deleteById(achievementId);
+        return AchievementDeletionResult.builder()
+                .deleted(true)
+                .message("Achievement deleted.")
+                .achievement(null)
+                .build();
+    }
 
     private Set<Long> getAllPrerequisiteIds(Long skillId) {
         Set<Long> visited = new java.util.LinkedHashSet<>();

@@ -279,3 +279,18 @@ FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Fronten
 CROSS JOIN skills s
 WHERE br.name='React'
  AND s.name IN ('HTML','CSS','JavaScript','TypeScript','React','Git');
+ 
+INSERT INTO achievements (code, title, description, icon, category, criteria_type, criteria_value) VALUES
+  ('FIRST_STEP', 'First Step', 'Complete your first roadmap step', 'flag', 'roadmap', 'ROADMAP_STEPS_COMPLETED', 1),
+  ('FIVE_STEPS', 'Building Momentum', 'Complete 5 roadmap steps', 'trending_up', 'roadmap', 'ROADMAP_STEPS_COMPLETED', 5),
+  ('TEN_STEPS', 'On A Roll', 'Complete 10 roadmap steps', 'rocket_launch', 'roadmap', 'ROADMAP_STEPS_COMPLETED', 10),
+  ('HALFWAY_THERE', 'Halfway There', 'Reach 50% of your roadmap', 'timelapse', 'roadmap', 'ROADMAP_PERCENT_COMPLETE', 50),
+  ('ROADMAP_MASTER', 'Roadmap Master', 'Complete 100% of your roadmap', 'emoji_events', 'roadmap', 'ROADMAP_PERCENT_COMPLETE', 100),
+  ('FIRST_SKILL_CHECK', 'Quiz Taker', 'Pass your first skill check', 'quiz', 'skill_check', 'SKILL_CHECKS_PASSED', 1),
+  ('SKILL_CHECK_ACE', 'Skill Check Ace', 'Pass 5 skill checks', 'workspace_premium', 'skill_check', 'SKILL_CHECKS_PASSED', 5),
+  ('STREAK_3', 'Warming Up', 'Reach a 3-day activity streak', 'local_fire_department', 'streak', 'STREAK_DAYS', 3),
+  ('STREAK_7', 'On Fire', 'Reach a 7-day activity streak', 'whatshot', 'streak', 'STREAK_DAYS', 7),
+  ('STREAK_30', 'Unstoppable', 'Reach a 30-day activity streak', 'bolt', 'streak', 'STREAK_DAYS', 30),
+  ('TEAM_PLAYER', 'Team Player', 'Join your first project', 'groups', 'project', 'PROJECTS_JOINED', 1),
+  ('PROJECT_LEADER', 'Project Leader', 'Create your first project', 'campaign', 'project', 'PROJECTS_CREATED', 1),
+  ('TUTOR_CHATTER', 'Curious Mind', 'Send 10 messages to the AI tutor', 'forum', 'chat', 'TUTOR_MESSAGES_SENT', 10);

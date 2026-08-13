@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 public interface ProjectRepository extends JpaRepository<Project, Long> {
  Page<Project> findByStatus(ProjectStatus status, Pageable pageable);
  Page<Project> findByOwnerId(Long ownerId, Pageable pageable);
+ long countByOwnerId(Long ownerId);
 
  @Query("""
      SELECT DISTINCT p FROM Project p

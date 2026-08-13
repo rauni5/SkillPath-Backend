@@ -4,10 +4,15 @@ CREATE TABLE users (
  email VARCHAR(255),
  name VARCHAR(120),
  bio TEXT,
+ phone_number VARCHAR(30),
+ location VARCHAR(255),
+ soft_skills TEXT,
  experience_level VARCHAR(20) CHECK (experience_level IN
 ('BEGINNER','INTERMEDIATE','ADVANCED')),
  availability BOOLEAN NOT NULL DEFAULT TRUE,
  avatar_url VARCHAR(500),
+ github_url VARCHAR(255),
+ linkedin_url VARCHAR(255),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  is_admin BOOLEAN NOT NULL DEFAULT FALSE
 );
@@ -136,6 +141,95 @@ CREATE TABLE branch_required_skills (
  importance INT NOT NULL CHECK (importance BETWEEN 1 AND 10),
  PRIMARY KEY (branch_id, skill_id)
 );
+CREATE TABLE dashboard_summaries (
+ user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ content TEXT NOT NULL,
+ generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE roadmap_chat_sessions (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ title VARCHAR(120),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE roadmap_chat_messages (
+ id BIGSERIAL PRIMARY KEY,
+ session_id BIGINT NOT NULL REFERENCES roadmap_chat_sessions(id) ON DELETE CASCADE,
+ role VARCHAR(10) NOT NULL CHECK (role IN ('USER','ASSISTANT')),
+ content TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE achievements (
+ id BIGSERIAL PRIMARY KEY,
+ code VARCHAR(50) UNIQUE NOT NULL,
+ title VARCHAR(100) NOT NULL,
+ description VARCHAR(255) NOT NULL,
+ icon VARCHAR(50) NOT NULL,
+ category VARCHAR(30) NOT NULL,
+ criteria_type VARCHAR(40) NOT NULL DEFAULT 'ROADMAP_STEPS_COMPLETED',
+ criteria_value INT NOT NULL DEFAULT 1,
+ enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+CREATE TABLE user_achievements (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ achievement_id BIGINT NOT NULL REFERENCES achievements(id) ON DELETE CASCADE,
+ unlocked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE (user_id, achievement_id)
+);
+CREATE TABLE user_streaks (
+ user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ current_streak INT NOT NULL DEFAULT 0,
+ longest_streak INT NOT NULL DEFAULT 0,
+ last_activity_date DATE
+);
+CREATE TABLE project_posts (
+ id BIGSERIAL PRIMARY KEY,
+ project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+ channel VARCHAR(10) NOT NULL CHECK (channel IN ('PUBLIC','TEAM')),
+ author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ tag VARCHAR(20) NOT NULL DEFAULT 'GENERAL' CHECK (tag IN ('GENERAL','QUESTION','UPDATE','ANNOUNCEMENT')),
+ title VARCHAR(200) NOT NULL,
+ body TEXT NOT NULL,
+ like_count INT NOT NULL DEFAULT 0,
+ comment_count INT NOT NULL DEFAULT 0,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE project_comments (
+ id BIGSERIAL PRIMARY KEY,
+ post_id BIGINT NOT NULL REFERENCES project_posts(id) ON DELETE CASCADE,
+ author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ body TEXT NOT NULL,
+ like_count INT NOT NULL DEFAULT 0,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE project_post_likes (
+ post_id BIGINT NOT NULL REFERENCES project_posts(id) ON DELETE CASCADE,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ PRIMARY KEY (post_id, user_id)
+);
+CREATE TABLE project_comment_likes (
+ comment_id BIGINT NOT NULL REFERENCES project_comments(id) ON DELETE CASCADE,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ PRIMARY KEY (comment_id, user_id)
+);
+CREATE INDEX idx_project_posts_board ON project_posts(project_id, channel, created_at);
+CREATE INDEX idx_project_comments_post ON project_comments(post_id, created_at);
+CREATE INDEX idx_user_achievements_user ON user_achievements(user_id);
+CREATE INDEX idx_roadmap_chat_sessions_user ON roadmap_chat_sessions(user_id, created_at);
+CREATE INDEX idx_roadmap_chat_messages_session ON roadmap_chat_messages(session_id, created_at);
+CREATE TABLE certifications (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ name VARCHAR(200) NOT NULL,
+ issuer VARCHAR(200),
+ credential_url VARCHAR(500),
+ earned_on DATE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_certifications_user_id ON certifications(user_id);
 CREATE INDEX idx_chat_messages_user_skill ON chat_messages(user_id, skill_id, created_at);
 CREATE INDEX idx_skill_check_attempts_user_skill ON skill_check_attempts(user_id, skill_id);
 CREATE INDEX idx_user_device_tokens_user_id ON user_device_tokens(user_id);
