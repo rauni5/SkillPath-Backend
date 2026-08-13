@@ -29,6 +29,7 @@ public class ProjectService {
     private final UserRepository userRepo;
     private final PortfolioService portfolioService;
     private final NotificationService notificationService;
+    private final ProjectDiscussionService discussionService;
     public Page<ProjectResponse> browseOpen(Pageable pageable) {
         return projectRepo.findByStatus(ProjectStatus.OPEN, pageable).map(this::enrich);
     }
@@ -152,6 +153,8 @@ public class ProjectService {
                             .status(MemberStatus.ACCEPTED)
                             .role("Owner")
                             .invitedByOwner(false).build());
+        // Seed the public board so the discussion never opens empty.
+        discussionService.createAboutPost(p.getId(), ownerId, p.getName(), p.getDescription());
         return enrich(p);
     }
     @Transactional

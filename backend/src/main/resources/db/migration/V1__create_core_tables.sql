@@ -169,6 +169,40 @@ CREATE TABLE user_streaks (
  longest_streak INT NOT NULL DEFAULT 0,
  last_activity_date DATE
 );
+CREATE TABLE project_posts (
+ id BIGSERIAL PRIMARY KEY,
+ project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+ channel VARCHAR(10) NOT NULL CHECK (channel IN ('PUBLIC','TEAM')),
+ author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ tag VARCHAR(20) NOT NULL DEFAULT 'GENERAL' CHECK (tag IN ('GENERAL','QUESTION','UPDATE','ANNOUNCEMENT')),
+ title VARCHAR(200) NOT NULL,
+ body TEXT NOT NULL,
+ like_count INT NOT NULL DEFAULT 0,
+ comment_count INT NOT NULL DEFAULT 0,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE project_comments (
+ id BIGSERIAL PRIMARY KEY,
+ post_id BIGINT NOT NULL REFERENCES project_posts(id) ON DELETE CASCADE,
+ author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ body TEXT NOT NULL,
+ like_count INT NOT NULL DEFAULT 0,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE project_post_likes (
+ post_id BIGINT NOT NULL REFERENCES project_posts(id) ON DELETE CASCADE,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ PRIMARY KEY (post_id, user_id)
+);
+CREATE TABLE project_comment_likes (
+ comment_id BIGINT NOT NULL REFERENCES project_comments(id) ON DELETE CASCADE,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ PRIMARY KEY (comment_id, user_id)
+);
+CREATE INDEX idx_project_posts_board ON project_posts(project_id, channel, created_at);
+CREATE INDEX idx_project_comments_post ON project_comments(post_id, created_at);
 CREATE INDEX idx_user_achievements_user ON user_achievements(user_id);
 CREATE INDEX idx_roadmap_chat_sessions_user ON roadmap_chat_sessions(user_id, created_at);
 CREATE INDEX idx_roadmap_chat_messages_session ON roadmap_chat_messages(session_id, created_at);
