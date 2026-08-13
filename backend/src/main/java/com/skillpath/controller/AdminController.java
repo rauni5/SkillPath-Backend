@@ -5,7 +5,6 @@ import com.skillpath.dto.request.*;
 import com.skillpath.dto.response.BranchRequirementResponse;
 import com.skillpath.dto.response.AchievementDeletionResult;
 import com.skillpath.dto.response.AdminAchievementResponse;
-import com.skillpath.dto.response.RoleRequirementResponse;
 import com.skillpath.dto.response.SkillResponse;
 import com.skillpath.dto.response.UserResponse;
 import com.skillpath.model.CareerRole.CareerRole;
@@ -175,6 +174,7 @@ public class AdminController {
     public ResponseEntity<ApiResponse<UserResponse>> bootstrap(Authentication auth) {
         FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
         return ResponseEntity.ok(ApiResponse.ok(adminService.bootstrapFirstAdmin(p.getUid())));
+    }
     // ACHIEVEMENT MANAGEMENT
     @GetMapping("/achievements")
     public ResponseEntity<ApiResponse<List<AdminAchievementResponse>>> listAchievements() {
