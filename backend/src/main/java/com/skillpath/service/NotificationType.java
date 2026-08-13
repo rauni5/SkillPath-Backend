@@ -17,7 +17,10 @@ public enum NotificationType {
     JOIN_REQUEST_ACCEPTED("PROJECT_JOIN_REQUEST_ACCEPTED"),
     
     /** The owner declined your join request. */
-    JOIN_REQUEST_REJECTED("PROJECT_JOIN_REQUEST_REJECTED");
+    JOIN_REQUEST_REJECTED("PROJECT_JOIN_REQUEST_REJECTED"),
+
+    /** Someone commented on your discussion post. */
+    DISCUSSION_COMMENT_RECEIVED("PROJECT_DISCUSSION_COMMENT_RECEIVED");
 
     private final String value;
 
