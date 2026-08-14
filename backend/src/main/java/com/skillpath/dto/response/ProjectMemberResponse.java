@@ -5,7 +5,9 @@ import lombok.*;
 public class ProjectMemberResponse {
     private Long userId;
     private String name;
+    private String email;
     private String avatarUrl;
     private MemberStatus status;
     private String role;
+    private boolean invitedByOwner;
 }

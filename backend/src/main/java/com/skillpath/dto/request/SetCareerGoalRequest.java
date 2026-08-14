@@ -5,4 +5,5 @@ import lombok.*;
 public class SetCareerGoalRequest { 
     @NotNull 
     private Long roleId; 
+    private Long branchId;
 }

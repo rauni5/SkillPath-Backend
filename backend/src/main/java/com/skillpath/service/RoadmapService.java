@@ -4,6 +4,7 @@ import com.skillpath.algorithm.graph.TopologicalSort;
 import com.skillpath.dto.response.RoadmapStepResponse;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.RoadmapStep.RoadmapStep;
+import com.skillpath.model.UserCareerGoal.UserCareerGoal;
 import com.skillpath.model.UserSkill.UserSkill;
 import com.skillpath.model.UserSkill.UserSkillId;
 import com.skillpath.model.enums.Proficiency;
@@ -19,7 +20,7 @@ public class RoadmapService {
     private final SkillDependencyRepository depRepo;
     private final UserSkillRepository userSkillRepo;
     private final UserCareerGoalRepository goalRepo;
-    private final RoleRequiredSkillRepository roleSkillRepo;
+    private final BranchRequiredSkillRepository branchSkillRepo;
     private final RoadmapStepRepository stepRepo;
     private final SkillRepository skillRepo;
     @Transactional
@@ -33,9 +34,13 @@ public class RoadmapService {
         });
         // 2. Load what the user already knows
         Set<Long> userSkills = userSkillRepo.findSkillIdsByUserId(userId);
-        // 3. Load what the target role requires
-        Long roleId = goalRepo.findRoleIdByUserId(userId).orElseThrow(() -> new ResourceNotFoundException("No career goal set for user: " + userId));
-        Set<Long> required = roleSkillRepo.findSkillIdsByRoleId(roleId);
+        // 3. Load what the selected branch requires
+        UserCareerGoal goal = goalRepo.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("No career goal set for user: " + userId));
+        if (goal.getBranchId() == null)
+            throw new IllegalStateException(
+                "This career goal has no branch selected yet — choose a branch before generating a roadmap.");
+        Set<Long> required = branchSkillRepo.findSkillIdsByBranchId(goal.getBranchId());
         // 4. Find every skill still needed (including transitive prerequisites)
         Set<Long> missing = graph.getMissingSkills(userSkills, required);
         // 5. Topological sort — valid learning sequence
@@ -66,15 +71,52 @@ public class RoadmapService {
         step.setCompletedAt(Instant.now());
         // Completing a roadmap step means the user now knows this skill —
         // add it to their profile (default Beginner) if they don't have it yet.
-        var skillId = new UserSkillId(userId, step.getSkillId());
-        if (!userSkillRepo.existsById(skillId)) {
-            userSkillRepo.save(UserSkill.builder()
-                .userId(userId)
-                .skillId(step.getSkillId())
-                .proficiency(Proficiency.BEGINNER)
-                .build());
-        }
+        upsertUserSkillIfAbsent(userId, step.getSkillId(), Proficiency.BEGINNER);
         return toResponse(stepRepo.save(step));
+    }
+
+    /**
+     * Called when a skill check is passed. Marks any pending roadmap step(s)
+     * for that skill as done and records the proficiency actually earned on
+     * the quiz, rather than defaulting to Beginner. Safe to call even if no
+     * roadmap step exists for this skill (e.g. skill checks taken outside a
+     * roadmap context) — it just updates the skill profile in that case.
+     */
+    @Transactional
+    public void completeStepsForSkill(Long userId, Long skillId, Proficiency earnedProficiency) {
+        List<RoadmapStep> steps = stepRepo.findByUserIdAndSkillId(userId, skillId);
+        Instant now = Instant.now();
+        for (RoadmapStep step : steps) {
+            if (step.getStatus() != StepStatus.DONE) {
+                step.setStatus(StepStatus.DONE);
+                step.setCompletedAt(now);
+                stepRepo.save(step);
+            }
+        }
+        upsertUserSkillOrRaise(userId, skillId, earnedProficiency);
+    }
+
+    private void upsertUserSkillIfAbsent(Long userId, Long skillId, Proficiency proficiency) {
+        var id = new UserSkillId(userId, skillId);
+        if (!userSkillRepo.existsById(id)) {
+            userSkillRepo.save(UserSkill.builder()
+                .userId(userId).skillId(skillId).proficiency(proficiency).build());
+        }
+    }
+
+    /** Unlike markDone's default, a skill-check result should always set the
+     * proficiency the user actually just earned — including raising an
+     * existing lower proficiency, since they've now demonstrated more. */
+    private void upsertUserSkillOrRaise(Long userId, Long skillId, Proficiency proficiency) {
+        var id = new UserSkillId(userId, skillId);
+        UserSkill existing = userSkillRepo.findById(id).orElse(null);
+        if (existing == null) {
+            userSkillRepo.save(UserSkill.builder()
+                .userId(userId).skillId(skillId).proficiency(proficiency).build());
+        } else if (proficiency.ordinal() > existing.getProficiency().ordinal()) {
+            existing.setProficiency(proficiency);
+            userSkillRepo.save(existing);
+        }
     }
     private List<RoadmapStepResponse> toResponses(List<RoadmapStep> steps) {
         return steps.stream().map(this::toResponse).toList();

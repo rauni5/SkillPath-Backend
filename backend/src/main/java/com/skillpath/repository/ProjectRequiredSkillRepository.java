@@ -7,6 +7,7 @@ import java.util.List; import java.util.Set;
 public interface ProjectRequiredSkillRepository
  extends JpaRepository<ProjectRequiredSkill, ProjectRequiredSkillId> {
  List<ProjectRequiredSkill> findByProjectId(Long projectId);
+ void deleteByProjectId(Long projectId);
  @Query("SELECT p.skillId FROM ProjectRequiredSkill p WHERE p.projectId = :id")
  Set<Long> findSkillIdsByProjectId(Long id);
 }

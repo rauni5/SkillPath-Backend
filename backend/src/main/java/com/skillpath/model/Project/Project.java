@@ -15,6 +15,7 @@ public class Project {
  @Enumerated(EnumType.STRING) @Builder.Default
  private ProjectStatus status = ProjectStatus.OPEN;
  @Column(name = "owner_id") private Long ownerId;
+ @Column(length = 500) private String link;
  @CreationTimestamp @Column(name = "created_at", updatable = false)
  private Instant createdAt;
 }

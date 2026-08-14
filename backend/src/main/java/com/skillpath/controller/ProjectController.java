@@ -22,17 +22,22 @@ public class ProjectController {
             @RequestParam(defaultValue="20") int size,
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) List<Long> skillIds,
+            @RequestParam(required = false) List<Long> roleIds,
             @RequestParam(required = false) String q) {
         return ResponseEntity.ok(ApiResponse.ok(
-                projectService.search(difficulty, skillIds, q, PageRequest.of(page, size))));
+                projectService.search(difficulty, skillIds, roleIds, q, PageRequest.of(page, size))));
     }
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProjectResponse>> get(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(projectService.getById(id)));
+    public ResponseEntity<ApiResponse<ProjectResponse>> get(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.ok(projectService.getById(id, currentUserId(auth))));
     }
     @PostMapping
     public ResponseEntity<ApiResponse<ProjectResponse>> create(Authentication auth, @Valid @RequestBody CreateProjectRequest req) {
         return ResponseEntity.ok(ApiResponse.ok(projectService.create(currentUserId(auth),req)));
+    }
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<ProjectResponse>> update(@PathVariable Long id, Authentication auth, @Valid @RequestBody UpdateProjectRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(projectService.update(id, currentUserId(auth), req)));
     }
     @PostMapping("/{id}/join")
     public ResponseEntity<ApiResponse<Void>> join(@PathVariable Long id, Authentication auth) {
@@ -49,6 +54,15 @@ public class ProjectController {
     @GetMapping("/{id}/members")
     public ResponseEntity<ApiResponse<List<ProjectMemberResponse>>> members(@PathVariable Long id, Authentication auth) {
         return ResponseEntity.ok(ApiResponse.ok(projectService.getMembers(id, currentUserId(auth))));
+    }
+    @GetMapping("/{id}/team")
+    public ResponseEntity<ApiResponse<List<ProjectMemberResponse>>> team(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.ok(projectService.getTeam(id, currentUserId(auth))));
+    }
+    @PostMapping("/{id}/invite/{userId}")
+    public ResponseEntity<ApiResponse<Void>> invite(@PathVariable Long id, @PathVariable Long userId, Authentication auth) {
+        projectService.inviteMember(id, currentUserId(auth), userId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
     }
     @DeleteMapping("/{id}/members/{userId}")
     public ResponseEntity<ApiResponse<Void>> removeMember(@PathVariable Long id, @PathVariable Long userId, Authentication auth) {

@@ -21,6 +21,9 @@ spring:
     locations: classpath:db/migration
 firebase:
   service-account: ${FIREBASE_SERVICE_ACCOUNT:}
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
 server:
   port: ${PORT:8080}
 springdoc:
