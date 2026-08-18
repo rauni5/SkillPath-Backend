@@ -16,12 +16,14 @@ public class DashboardService {
         // Career progress — 0% if no goal set
         int progress = 0; String roleName = null;
         int knownSkillCount = 0; int requiredSkillCount = 0;
+        String branchName = null;
         try {
             GapAnalysisResponse gap = goalService.getGapAnalysis(userId);
             progress = gap.getProgressPercent();
             roleName = gap.getCareerRoleName();
             knownSkillCount = gap.getKnownSkillCount();
             requiredSkillCount = gap.getRequiredSkillCount();
+            branchName = gap.getBranchName();
         } catch (Exception ignored) {}
         // Roadmap stats
         var steps = stepRepo.findByUserIdOrderByStepOrder(userId);
@@ -46,6 +48,7 @@ public class DashboardService {
                             .careerRoleName(roleName)
                             .knownSkillCount(knownSkillCount)
                             .requiredSkillCount(requiredSkillCount)
+                            .branchName(branchName)
                             .roadmapCompletedSteps((int) done)
                             .roadmapTotalSteps(steps.size())
                             .nextSkillsToLearn(nextSkills)

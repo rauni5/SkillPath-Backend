@@ -2,12 +2,13 @@ package com.skillpath.controller;
 
 import com.skillpath.dto.ApiResponse;
 import com.skillpath.dto.request.*;
+import com.skillpath.dto.response.BranchRequirementResponse;
 import com.skillpath.dto.response.AchievementDeletionResult;
 import com.skillpath.dto.response.AdminAchievementResponse;
-import com.skillpath.dto.response.RoleRequirementResponse;
 import com.skillpath.dto.response.SkillResponse;
 import com.skillpath.dto.response.UserResponse;
 import com.skillpath.model.CareerRole.CareerRole;
+import com.skillpath.model.RoleBranch.RoleBranch;
 import com.skillpath.security.FirebasePrincipal;
 import com.skillpath.service.AdminService;
 import jakarta.validation.Valid;
@@ -24,15 +25,6 @@ import java.util.List;
 public class AdminController {
 
     private final AdminService adminService;
-
-    // one-time bootstrap
-
-    @PostMapping("/setup")
-    public ResponseEntity<ApiResponse<UserResponse>> setup(Authentication auth) {
-        FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
-        return ResponseEntity.ok(ApiResponse.ok(
-                adminService.bootstrapFirstAdmin(p.getUid())));
-    }
 
     // SKILL MANAGEMENT
     @GetMapping("/skills/{skillId}")
@@ -55,6 +47,7 @@ public class AdminController {
         adminService.deleteSkill(skillId);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
+
     @PostMapping("/skills/{skillId}/dependencies")
     public ResponseEntity<ApiResponse<Void>> addDependency(
             @PathVariable Long skillId,
@@ -103,36 +96,62 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
-    @PostMapping("/career-roles/{roleId}/requirements")
-    public ResponseEntity<ApiResponse<Void>> addRequirement(
-            @PathVariable Long roleId,
+    // BRANCH MANAGEMENT — a role's actual required skills always live on a
+    // branch now; there is no direct role-level skill list anymore.
+    @GetMapping("/career-roles/{roleId}/branches")
+    public ResponseEntity<ApiResponse<List<RoleBranch>>> getBranches(@PathVariable Long roleId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getBranches(roleId)));
+    }
+
+    @GetMapping("/branches/{branchId}")
+    public ResponseEntity<ApiResponse<RoleBranch>> getBranch(@PathVariable Long branchId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getBranch(branchId)));
+    }
+
+    @PostMapping("/career-roles/{roleId}/branches")
+    public ResponseEntity<ApiResponse<RoleBranch>> createBranch(
+            @PathVariable Long roleId, @Valid @RequestBody CreateBranchRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.createBranch(roleId, req)));
+    }
+
+    @PutMapping("/branches/{branchId}")
+    public ResponseEntity<ApiResponse<RoleBranch>> updateBranch(
+            @PathVariable Long branchId, @Valid @RequestBody CreateBranchRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.updateBranch(branchId, req)));
+    }
+
+    @DeleteMapping("/branches/{branchId}")
+    public ResponseEntity<ApiResponse<Void>> deleteBranch(@PathVariable Long branchId) {
+        adminService.deleteBranch(branchId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @PostMapping("/branches/{branchId}/requirements")
+    public ResponseEntity<ApiResponse<Void>> addBranchRequirement(
+            @PathVariable Long branchId, @Valid @RequestBody AddRequirementRequest req) {
+        adminService.addBranchRequirement(branchId, req);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @PutMapping("/branches/{branchId}/requirements/{skillId}")
+    public ResponseEntity<ApiResponse<Void>> updateBranchRequirement(
+            @PathVariable Long branchId, @PathVariable Long skillId,
             @Valid @RequestBody AddRequirementRequest req) {
-        adminService.addRoleRequirement(roleId, req);
+        adminService.updateBranchRequirement(branchId, skillId, req);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
-    @PutMapping("/career-roles/{roleId}/requirements/{skillId}")
-    public ResponseEntity<ApiResponse<Void>> updateRequirement(
-            @PathVariable Long roleId,
-            @PathVariable Long skillId,
-            @Valid @RequestBody AddRequirementRequest req) {
-        adminService.updateRoleRequirement(roleId, skillId, req);
+    @DeleteMapping("/branches/{branchId}/requirements/{skillId}")
+    public ResponseEntity<ApiResponse<Void>> removeBranchRequirement(
+            @PathVariable Long branchId, @PathVariable Long skillId) {
+        adminService.removeBranchRequirement(branchId, skillId);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
-    @DeleteMapping("/career-roles/{roleId}/requirements/{skillId}")
-    public ResponseEntity<ApiResponse<Void>> removeRequirement(
-            @PathVariable Long roleId,
-            @PathVariable Long skillId) {
-        adminService.removeRoleRequirement(roleId, skillId);
-        return ResponseEntity.ok(ApiResponse.ok(null));
-    }
-
-
-    @GetMapping("/career-roles/{roleId}/requirements")
-    public ResponseEntity<ApiResponse<List<RoleRequirementResponse>>> getRequirements(
-            @PathVariable Long roleId) {
-        return ResponseEntity.ok(ApiResponse.ok(adminService.getRoleRequirements(roleId)));
+    @GetMapping("/branches/{branchId}/requirements")
+    public ResponseEntity<ApiResponse<List<BranchRequirementResponse>>> getBranchRequirements(
+            @PathVariable Long branchId) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getBranchRequirements(branchId)));
     }
 
     // USER MANAGEMENT
@@ -149,6 +168,13 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok(adminService.setAdminFlag(userId, isAdmin)));
     }
 
+    // ONE-TIME BOOTSTRAP — promotes the calling (already-authenticated) user
+    // to admin, but only if no admin exists yet at all.
+    @PostMapping("/setup")
+    public ResponseEntity<ApiResponse<UserResponse>> bootstrap(Authentication auth) {
+        FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
+        return ResponseEntity.ok(ApiResponse.ok(adminService.bootstrapFirstAdmin(p.getUid())));
+    }
     // ACHIEVEMENT MANAGEMENT
     @GetMapping("/achievements")
     public ResponseEntity<ApiResponse<List<AdminAchievementResponse>>> listAchievements() {

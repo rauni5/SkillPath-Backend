@@ -12,6 +12,7 @@ import com.skillpath.dto.response.PortfolioResponse;
 import com.skillpath.dto.response.ProjectInviteResponse;
 import com.skillpath.dto.response.ProjectResponse;
 import com.skillpath.dto.response.UserResponse;
+import com.skillpath.dto.response.UserSearchResultResponse;
 import com.skillpath.exception.ForbiddenException;
 import com.skillpath.security.FirebasePrincipal;
 import com.skillpath.service.PortfolioService;
@@ -38,6 +39,16 @@ public class UserController {
     public ResponseEntity<ApiResponse<PortfolioResponse>> portfolio(@PathVariable Long id, Authentication auth) {
         requireSelf(id, auth);
         return ResponseEntity.ok(ApiResponse.ok(portfolioService.getSummary(id)));
+    }
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<Page<UserSearchResultResponse>>> search(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        if (q == null || q.trim().length() < 2) {
+            return ResponseEntity.ok(ApiResponse.ok(Page.empty(PageRequest.of(page, size))));
+        }
+        return ResponseEntity.ok(ApiResponse.ok(userService.search(q, PageRequest.of(page, size))));
     }
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(

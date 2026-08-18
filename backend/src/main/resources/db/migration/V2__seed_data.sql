@@ -3,7 +3,8 @@ INSERT INTO career_roles (name, description) VALUES
  ('Full Stack Developer','Works across frontend and backend'),
  ('Mobile Developer', 'Builds iOS and Android applications'),
  ('DevOps Engineer', 'Manages infrastructure and CI/CD'),
- ('Data Engineer', 'Builds data pipelines and analytics');
+ ('Data Engineer', 'Builds data pipelines and analytics'),
+ ('Frontend Developer', 'Builds user-facing web interfaces and client-side experiences');
 INSERT INTO skills (name, category) VALUES
  ('Java','BACKEND'),('OOP','BACKEND'),('Collections','BACKEND'),
  ('Spring','BACKEND'),('Spring Boot','BACKEND'),('REST APIs','BACKEND'),
@@ -16,7 +17,12 @@ INSERT INTO skills (name, category) VALUES
  ('State Management','MOBILE'),
  ('Python','DATA_ENGINEERING'),('Pandas','DATA_ENGINEERING'),
  ('ETL Pipelines','DATA_ENGINEERING'),('Data Warehousing','DATA_ENGINEERING'),
- ('Apache Airflow','DATA_ENGINEERING');
+ ('Apache Airflow','DATA_ENGINEERING'),
+ ('Node.js','BACKEND'),('Express.js','BACKEND'),
+ ('MongoDB','DATABASE'),('Django','BACKEND'),
+ ('Swift','MOBILE'),('Kotlin','MOBILE'),
+ ('Scala','DATA_ENGINEERING'),('Apache Spark','DATA_ENGINEERING'),
+ ('TypeScript','FRONTEND');
 INSERT INTO skill_dependencies(skill_id, prerequisite_id)
 SELECT s.id, p.id FROM skills s JOIN skills p ON true WHERE
  (s.name='OOP' AND p.name='Java') OR
@@ -40,7 +46,14 @@ SELECT s.id, p.id FROM skills s JOIN skills p ON true WHERE
  (s.name='ETL Pipelines' AND p.name='SQL') OR
  (s.name='ETL Pipelines' AND p.name='Python') OR
  (s.name='Data Warehousing' AND p.name='SQL') OR
- (s.name='Apache Airflow' AND p.name='ETL Pipelines');
+ (s.name='Apache Airflow' AND p.name='ETL Pipelines') OR
+ (s.name='Node.js' AND p.name='JavaScript') OR
+ (s.name='Express.js' AND p.name='Node.js') OR
+ (s.name='MongoDB' AND p.name='Node.js') OR
+ (s.name='Django' AND p.name='Python') OR
+ (s.name='Apache Spark' AND p.name='Python') OR
+ (s.name='TypeScript' AND p.name='JavaScript');
+ 
 INSERT INTO role_required_skills(role_id, skill_id, importance)
 SELECT r.id, s.id,
  CASE s.name WHEN 'Java' THEN 10 WHEN 'Spring Boot' THEN 10
@@ -91,6 +104,181 @@ FROM career_roles r CROSS JOIN skills s
 WHERE r.name='Data Engineer'
  AND s.name IN ('Python','SQL','PostgreSQL','Pandas','ETL Pipelines',
  'Data Warehousing','Apache Airflow','Git');
+
+INSERT INTO role_required_skills(role_id, skill_id, importance)
+SELECT r.id, s.id,
+ CASE s.name WHEN 'JavaScript' THEN 9 WHEN 'React' THEN 8 WHEN 'TypeScript' THEN 7
+ WHEN 'HTML' THEN 7 WHEN 'CSS' THEN 7 ELSE 6 END
+FROM career_roles r CROSS JOIN skills s
+WHERE r.name='Frontend Developer'
+ AND s.name IN ('HTML','CSS','JavaScript','TypeScript','React','Git');
+
+INSERT INTO role_branches(role_id, name, description)
+SELECT r.id, b.name, b.description
+FROM career_roles r
+CROSS JOIN (VALUES
+ ('MERN','MongoDB, Express.js, React, and Node.js'),
+ ('Django','Python and Django on the backend, with a JS/HTML/CSS frontend'),
+ ('Spring','Java and Spring Boot on the backend, with a JS/HTML/CSS frontend')
+) AS b(name, description)
+WHERE r.name='Full Stack Developer';
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'JavaScript' THEN 9 WHEN 'React' THEN 9
+ WHEN 'Node.js' THEN 9 WHEN 'Express.js' THEN 8 WHEN 'MongoDB' THEN 8
+ WHEN 'HTML' THEN 6 WHEN 'CSS' THEN 6 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Full Stack Developer'
+CROSS JOIN skills s
+WHERE br.name='MERN'
+ AND s.name IN ('JavaScript','React','Node.js','Express.js','MongoDB','HTML','CSS','Git');
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Python' THEN 10 WHEN 'Django' THEN 9
+ WHEN 'PostgreSQL' THEN 7 WHEN 'HTML' THEN 6 WHEN 'CSS' THEN 6 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Full Stack Developer'
+CROSS JOIN skills s
+WHERE br.name='Django'
+ AND s.name IN ('Python','Django','PostgreSQL','HTML','CSS','Git');
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Java' THEN 9 WHEN 'Spring Boot' THEN 9
+ WHEN 'OOP' THEN 7 WHEN 'Collections' THEN 6 WHEN 'Spring' THEN 7
+ WHEN 'REST APIs' THEN 7 WHEN 'PostgreSQL' THEN 7
+ WHEN 'HTML' THEN 5 WHEN 'CSS' THEN 5 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Full Stack Developer'
+CROSS JOIN skills s
+WHERE br.name='Spring'
+ AND s.name IN ('Java','OOP','Collections','Spring','Spring Boot','REST APIs',
+ 'PostgreSQL','HTML','CSS','Git');
+
+INSERT INTO role_branches(role_id, name, description)
+SELECT r.id, b.name, b.description
+FROM career_roles r
+CROSS JOIN (VALUES
+ ('Java / Spring','Java and the Spring ecosystem'),
+ ('Python / Django','Python with the Django framework'),
+ ('Node.js / Express','JavaScript on the server with Node.js and Express')
+) AS b(name, description)
+WHERE r.name='Backend Developer';
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Java' THEN 9 WHEN 'Spring Boot' THEN 9 WHEN 'OOP' THEN 7
+ WHEN 'Collections' THEN 6 WHEN 'Spring' THEN 7 WHEN 'REST APIs' THEN 8
+ WHEN 'PostgreSQL' THEN 7 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Backend Developer'
+CROSS JOIN skills s
+WHERE br.name='Java / Spring'
+ AND s.name IN ('Java','OOP','Collections','Spring','Spring Boot','REST APIs','PostgreSQL','SQL','Git');
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Python' THEN 10 WHEN 'Django' THEN 9 WHEN 'PostgreSQL' THEN 7 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Backend Developer'
+CROSS JOIN skills s
+WHERE br.name='Python / Django'
+ AND s.name IN ('Python','Django','PostgreSQL','SQL','Git');
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Node.js' THEN 9 WHEN 'Express.js' THEN 9 WHEN 'JavaScript' THEN 8
+ WHEN 'MongoDB' THEN 7 WHEN 'REST APIs' THEN 7 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Backend Developer'
+CROSS JOIN skills s
+WHERE br.name='Node.js / Express'
+ AND s.name IN ('Node.js','Express.js','JavaScript','MongoDB','REST APIs','SQL','Git');
+
+INSERT INTO role_branches(role_id, name, description)
+SELECT r.id, b.name, b.description
+FROM career_roles r
+CROSS JOIN (VALUES
+ ('Flutter','Cross-platform apps with Dart and Flutter'),
+ ('Native iOS','iOS apps with Swift'),
+ ('Native Android','Android apps with Kotlin')
+) AS b(name, description)
+WHERE r.name='Mobile Developer';
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Dart' THEN 10 WHEN 'Flutter' THEN 10 WHEN 'State Management' THEN 8
+ WHEN 'REST APIs' THEN 7 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Mobile Developer'
+CROSS JOIN skills s
+WHERE br.name='Flutter'
+ AND s.name IN ('Dart','Flutter','State Management','REST APIs','Git');
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Swift' THEN 10 WHEN 'REST APIs' THEN 7 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Mobile Developer'
+CROSS JOIN skills s
+WHERE br.name='Native iOS'
+ AND s.name IN ('Swift','REST APIs','Git');
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Kotlin' THEN 10 WHEN 'REST APIs' THEN 7 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Mobile Developer'
+CROSS JOIN skills s
+WHERE br.name='Native Android'
+ AND s.name IN ('Kotlin','REST APIs','Git');
+
+INSERT INTO role_branches(role_id, name, description)
+SELECT r.id, b.name, b.description
+FROM career_roles r
+CROSS JOIN (VALUES
+ ('Python / Airflow','Batch pipelines with Python, Pandas, and Airflow'),
+ ('Spark / Big Data','Large-scale data processing with Spark')
+) AS b(name, description)
+WHERE r.name='Data Engineer';
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Python' THEN 10 WHEN 'Pandas' THEN 8 WHEN 'ETL Pipelines' THEN 9
+ WHEN 'Apache Airflow' THEN 8 WHEN 'SQL' THEN 8 WHEN 'PostgreSQL' THEN 6 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Data Engineer'
+CROSS JOIN skills s
+WHERE br.name='Python / Airflow'
+ AND s.name IN ('Python','Pandas','ETL Pipelines','Apache Airflow','SQL','PostgreSQL','Git');
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Python' THEN 8 WHEN 'Scala' THEN 8 WHEN 'Apache Spark' THEN 10
+ WHEN 'SQL' THEN 7 WHEN 'Data Warehousing' THEN 7 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Data Engineer'
+CROSS JOIN skills s
+WHERE br.name='Spark / Big Data'
+ AND s.name IN ('Python','Scala','Apache Spark','SQL','Data Warehousing','Git');
+
+INSERT INTO role_branches(role_id, name, description)
+SELECT r.id, 'Cloud Infrastructure', 'Linux, containers, CI/CD, and AWS-based infrastructure'
+FROM career_roles r WHERE r.name='DevOps Engineer';
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'Linux' THEN 10 WHEN 'Docker' THEN 10
+ WHEN 'CI/CD' THEN 9 WHEN 'Kubernetes' THEN 8 WHEN 'AWS' THEN 8
+ ELSE 7 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='DevOps Engineer'
+CROSS JOIN skills s
+WHERE br.name='Cloud Infrastructure'
+ AND s.name IN ('Linux','Docker','CI/CD','Kubernetes','Git','AWS','Terraform');
+
+INSERT INTO role_branches(role_id, name, description)
+SELECT r.id, 'React', 'Modern JavaScript/TypeScript frontends built with React'
+FROM career_roles r WHERE r.name='Frontend Developer';
+
+INSERT INTO branch_required_skills(branch_id, skill_id, importance)
+SELECT br.id, s.id,
+ CASE s.name WHEN 'JavaScript' THEN 9 WHEN 'React' THEN 8 WHEN 'TypeScript' THEN 7
+ WHEN 'HTML' THEN 7 WHEN 'CSS' THEN 7 ELSE 6 END
+FROM role_branches br JOIN career_roles r ON r.id=br.role_id AND r.name='Frontend Developer'
+CROSS JOIN skills s
+WHERE br.name='React'
+ AND s.name IN ('HTML','CSS','JavaScript','TypeScript','React','Git');
  
 INSERT INTO achievements (code, title, description, icon, category, criteria_type, criteria_value) VALUES
   ('FIRST_STEP', 'First Step', 'Complete your first roadmap step', 'flag', 'roadmap', 'ROADMAP_STEPS_COMPLETED', 1),
