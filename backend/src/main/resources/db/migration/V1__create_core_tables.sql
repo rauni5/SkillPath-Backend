@@ -146,15 +146,15 @@ CREATE TABLE dashboard_summaries (
  content TEXT NOT NULL,
  generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE TABLE roadmap_chat_sessions (
+CREATE TABLE assistant_sessions (
  id BIGSERIAL PRIMARY KEY,
  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  title VARCHAR(120),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE TABLE roadmap_chat_messages (
+CREATE TABLE Assistant_messages (
  id BIGSERIAL PRIMARY KEY,
- session_id BIGINT NOT NULL REFERENCES roadmap_chat_sessions(id) ON DELETE CASCADE,
+ session_id BIGINT NOT NULL REFERENCES assistant_sessions(id) ON DELETE CASCADE,
  role VARCHAR(10) NOT NULL CHECK (role IN ('USER','ASSISTANT')),
  content TEXT NOT NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -218,8 +218,8 @@ CREATE TABLE project_comment_likes (
 CREATE INDEX idx_project_posts_board ON project_posts(project_id, channel, created_at);
 CREATE INDEX idx_project_comments_post ON project_comments(post_id, created_at);
 CREATE INDEX idx_user_achievements_user ON user_achievements(user_id);
-CREATE INDEX idx_roadmap_chat_sessions_user ON roadmap_chat_sessions(user_id, created_at);
-CREATE INDEX idx_roadmap_chat_messages_session ON roadmap_chat_messages(session_id, created_at);
+CREATE INDEX idx_assistant_sessions_user ON assistant_sessions(user_id, created_at);
+CREATE INDEX idx_assistant_messages_session ON assistant_messages(session_id, created_at);
 CREATE TABLE certifications (
  id BIGSERIAL PRIMARY KEY,
  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
