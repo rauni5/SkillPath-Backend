@@ -1,11 +1,11 @@
 package com.skillpath.controller;
 import com.skillpath.dto.ApiResponse;
 import com.skillpath.dto.request.SendChatMessageRequest;
-import com.skillpath.dto.response.RoadmapChatMessageResponse;
-import com.skillpath.dto.response.RoadmapChatSessionResponse;
+import com.skillpath.dto.response.AssistantMessageResponse;
+import com.skillpath.dto.response.AssistantSessionResponse;
 import com.skillpath.exception.ForbiddenException;
 import com.skillpath.security.FirebasePrincipal;
-import com.skillpath.service.RoadmapChatService;
+import com.skillpath.service.AssistantChatService;
 import com.skillpath.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,34 +14,34 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
-@RestController @RequestMapping("/api/v1/users/{userId}/roadmap-chat") @RequiredArgsConstructor
-public class RoadmapChatController {
-    private final RoadmapChatService chatService;
+@RestController @RequestMapping("/api/v1/users/{userId}/assistant-chat") @RequiredArgsConstructor
+public class AssistantChatController {
+    private final AssistantChatService chatService;
     private final UserService userService;
 
     @GetMapping("/sessions")
-    public ResponseEntity<ApiResponse<List<RoadmapChatSessionResponse>>> listSessions(
+    public ResponseEntity<ApiResponse<List<AssistantSessionResponse>>> listSessions(
             @PathVariable Long userId, Authentication auth) {
         requireSelf(userId, auth);
         return ResponseEntity.ok(ApiResponse.ok(chatService.listSessions(userId)));
     }
 
     @PostMapping("/sessions")
-    public ResponseEntity<ApiResponse<RoadmapChatSessionResponse>> createSession(
+    public ResponseEntity<ApiResponse<AssistantSessionResponse>> createSession(
             @PathVariable Long userId, Authentication auth) {
         requireSelf(userId, auth);
         return ResponseEntity.ok(ApiResponse.ok(chatService.createSession(userId)));
     }
 
     @GetMapping("/sessions/{sessionId}/messages")
-    public ResponseEntity<ApiResponse<List<RoadmapChatMessageResponse>>> messages(
+    public ResponseEntity<ApiResponse<List<AssistantMessageResponse>>> messages(
             @PathVariable Long userId, @PathVariable Long sessionId, Authentication auth) {
         requireSelf(userId, auth);
         return ResponseEntity.ok(ApiResponse.ok(chatService.getMessages(userId, sessionId)));
     }
 
     @PostMapping("/sessions/{sessionId}/messages")
-    public ResponseEntity<ApiResponse<RoadmapChatMessageResponse>> send(
+    public ResponseEntity<ApiResponse<AssistantMessageResponse>> send(
             @PathVariable Long userId, @PathVariable Long sessionId,
             @Valid @RequestBody SendChatMessageRequest req, Authentication auth) {
         requireSelf(userId, auth);
