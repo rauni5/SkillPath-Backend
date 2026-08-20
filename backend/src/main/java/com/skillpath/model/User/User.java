@@ -32,6 +32,4 @@ public class User {
  @Column(name = "is_admin", nullable = false)
  @Builder.Default
  private boolean admin = false;
- @Column(nullable = false)@Builder.Default
- private boolean active = true;
 }
