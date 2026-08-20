@@ -47,6 +47,7 @@ public class AdminService {
     private final ProjectRepository           projectRepo;
     private final UserSkillRepository         userSkillRepo;
     private final UserCareerGoalRepository    userCareerGoalRepo;
+    private final RoleRequiredSkillRepository roleSkillRepo;
     // NOTE: FirebaseAnalyticsService is intentionally no longer wired in —
     // the GA4 numbers weren't reporting anything useful in practice, so the
     // dashboard stopped calling it. The service class is still here if you
@@ -489,6 +490,7 @@ public class AdminService {
     /** Total rows in user_skills — i.e. sum of skills owned across all users. */
     private long totalSkillOwnershipRows() {
         return userSkillRepo.count();
+    }
     // USER MANAGEMENT
     public List<UserResponse> listAllUsers() {
         return userRepo.findAll().stream().map(UserResponse::from).toList();
