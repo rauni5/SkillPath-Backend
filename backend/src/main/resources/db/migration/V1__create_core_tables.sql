@@ -6,6 +6,7 @@ CREATE TABLE users (
  bio TEXT,
  phone_number VARCHAR(30),
  location VARCHAR(255),
+ active boolean NOT NULL DEFAULT true,
  soft_skills TEXT,
  experience_level VARCHAR(20) CHECK (experience_level IN
 ('BEGINNER','INTERMEDIATE','ADVANCED')),

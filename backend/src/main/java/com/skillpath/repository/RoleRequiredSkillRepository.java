@@ -9,4 +9,10 @@ public interface RoleRequiredSkillRepository
  List<RoleRequiredSkill> findByRoleId(Long roleId);
  @Query("SELECT r.skillId FROM RoleRequiredSkill r WHERE r.roleId = :roleId")
  Set<Long> findSkillIdsByRoleId(Long roleId);
+ @Query("SELECT r.roleId AS roleId, COUNT(r) AS cnt FROM RoleRequiredSkill r GROUP BY r.roleId")
+ List<CountByRole> countGroupedByRole();
+ interface CountByRole {
+     Long getRoleId();
+     long getCnt();
+ }
 }
