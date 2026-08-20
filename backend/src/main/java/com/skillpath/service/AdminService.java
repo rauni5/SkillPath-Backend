@@ -1,9 +1,7 @@
 package com.skillpath.service;
 
 import com.skillpath.dto.request.*;
-import com.skillpath.dto.response.BranchRequirementResponse;
-import com.skillpath.dto.response.SkillResponse;
-import com.skillpath.dto.response.UserResponse;
+import com.skillpath.dto.response.*;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.BranchRequiredSkill.BranchRequiredSkill;
 import com.skillpath.model.BranchRequiredSkill.BranchRequiredSkillId;
@@ -16,12 +14,21 @@ import com.skillpath.model.Skill.Skill;
 import com.skillpath.model.SkillDependency.SkillDependency;
 import com.skillpath.model.SkillDependency.SkillDependencyId;
 import com.skillpath.model.User.User;
+import com.skillpath.model.enums.ProjectStatus;
+import com.skillpath.model.enums.Proficiency;
 import com.skillpath.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -37,6 +44,14 @@ public class AdminService {
     private final SkillTrieService            trieService;
     private final AchievementRepository       achievementRepo;
     private final UserAchievementRepository   userAchievementRepo;
+    private final ProjectRepository           projectRepo;
+    private final UserSkillRepository         userSkillRepo;
+    private final UserCareerGoalRepository    userCareerGoalRepo;
+    private final RoleRequiredSkillRepository roleSkillRepo;
+    // NOTE: FirebaseAnalyticsService is intentionally no longer wired in —
+    // the GA4 numbers weren't reporting anything useful in practice, so the
+    // dashboard stopped calling it. The service class is still here if you
+    // want to bring it back later; just re-add the field + call below.
 
     // SKILL MANAGEMENT
     @Transactional
@@ -159,6 +174,30 @@ public class AdminService {
     public CareerRole getCareerRole(Long roleId) {
         return roleRepo.findById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Career role not found: " + roleId));
+    }
+
+    /** All career roles enriched with stats (# of required skills, # of
+     *  users who chose it as their goal) — powers the admin Roles list. */
+    public List<AdminRoleSummaryResponse> listRolesWithStats() {
+        List<CareerRole> roles = roleRepo.findAll();
+        Map<Long, Long> requirementCounts = roleSkillRepo.countGroupedByRole().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        RoleRequiredSkillRepository.CountByRole::getRoleId,
+                        RoleRequiredSkillRepository.CountByRole::getCnt));
+        Map<Long, Long> popularity = userCareerGoalRepo.countGroupedByRole().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        UserCareerGoalRepository.CountByRole::getRoleId,
+                        UserCareerGoalRepository.CountByRole::getCnt));
+
+        return roles.stream()
+                .map(r -> AdminRoleSummaryResponse.builder()
+                        .id(r.getId())
+                        .name(r.getName())
+                        .description(r.getDescription())
+                        .requirementsCount(requirementCounts.getOrDefault(r.getId(), 0L))
+                        .popularity(popularity.getOrDefault(r.getId(), 0L))
+                        .build())
+                .toList();
     }
 
     @Transactional
@@ -301,17 +340,183 @@ public class AdminService {
                 .toList();
     }
 
+    /** Paginated, optionally filtered by a name/email search term. Each
+     *  row is enriched with per-user stats (skills/projects/achievements
+     *  counts, career-goal flag), batched into one query per stat rather
+     *  than N+1 per page. */
+    /** Paginated, optionally filtered by a name/email search term and a
+     *  status filter (all / admins only / active only / inactive only).
+     *  Each row is enriched with per-user stats (skills/projects/
+     *  achievements counts, career-goal flag), batched into one query per
+     *  stat rather than N+1 per page. */
+    public Page<AdminUserSummaryResponse> listUsers(String q, String status, Pageable pageable) {
+        String normalizedQ = (q == null || q.isBlank()) ? null : q.trim();
+        Boolean adminFilter = "ADMIN".equalsIgnoreCase(status) ? Boolean.TRUE : null;
+        Boolean activeFilter = switch (status == null ? "ALL" : status.toUpperCase()) {
+            case "ACTIVE" -> Boolean.TRUE;
+            case "INACTIVE" -> Boolean.FALSE;
+            default -> null;
+        };
+        Page<User> page = userRepo.search(normalizedQ, adminFilter, activeFilter, pageable);
+        List<Long> ids = page.getContent().stream().map(User::getId).toList();
+
+        Map<Long, Long> skillCounts = ids.isEmpty() ? Map.of() : userSkillRepo.countByUserIds(ids).stream()
+                .collect(java.util.stream.Collectors.toMap(UserSkillRepository.CountByUser::getUserId, UserSkillRepository.CountByUser::getCnt));
+        Map<Long, Long> projectCounts = ids.isEmpty() ? Map.of() : projectRepo.countByOwnerIds(ids).stream()
+                .collect(java.util.stream.Collectors.toMap(ProjectRepository.CountByOwner::getOwnerId, ProjectRepository.CountByOwner::getCnt));
+        Map<Long, Long> achievementCounts = ids.isEmpty() ? Map.of() : userAchievementRepo.countByUserIds(ids).stream()
+                .collect(java.util.stream.Collectors.toMap(UserAchievementRepository.CountByUser::getUserId, UserAchievementRepository.CountByUser::getCnt));
+        Set<Long> goalSetIds = ids.isEmpty() ? Set.of() : Set.copyOf(userCareerGoalRepo.findUserIdsWithGoalSet(ids));
+
+        return page.map(u -> AdminUserSummaryResponse.builder()
+                .user(UserResponse.from(u))
+                .skillsCount(skillCounts.getOrDefault(u.getId(), 0L))
+                .ownedProjectsCount(projectCounts.getOrDefault(u.getId(), 0L))
+                .achievementsCount(achievementCounts.getOrDefault(u.getId(), 0L))
+                .careerGoalSet(goalSetIds.contains(u.getId()))
+                .build());
+    }
+
+    /** Aggregate stats for the admin "Users" screen. */
+    public AdminUserAnalyticsResponse getUserAnalytics() {
+        long totalUsers = userRepo.count();
+        Instant now = Instant.now();
+        Instant sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
+        Instant thirtyDaysAgo = now.minus(30, ChronoUnit.DAYS);
+
+        Map<String, Long> byExperience = new LinkedHashMap<>();
+        for (Proficiency level : Proficiency.values()) {
+            byExperience.put(level.name(), userRepo.countByExperienceLevel(level));
+        }
+
+        long usersWithSkills = userSkillRepo.countDistinctUsers();
+        double avgSkillsPerUser = usersWithSkills == 0
+                ? 0.0
+                : (double) totalSkillOwnershipRows() / usersWithSkills;
+
+        List<DailyCountResponse> trend = signupTrend(thirtyDaysAgo);
+
+        return AdminUserAnalyticsResponse.builder()
+                .totalUsers(totalUsers)
+                .adminCount(userRepo.countByAdminTrue())
+                .availableCount(userRepo.countByAvailabilityTrue())
+                .unavailableCount(totalUsers - userRepo.countByAvailabilityTrue())
+                .usersWithCareerGoalSet(userCareerGoalRepo.count())
+                .avgSkillsPerUser(Math.round(avgSkillsPerUser * 100.0) / 100.0)
+                .newUsersLast7Days(userRepo.countByCreatedAtAfter(sevenDaysAgo))
+                .newUsersLast30Days(userRepo.countByCreatedAtAfter(thirtyDaysAgo))
+                .byExperienceLevel(byExperience)
+                .signupTrend(trend)
+                .build();
+    }
+
+    /** Platform-wide stats for the admin overview/dashboard screen.
+     *  [trendDays] controls the signup-trend window (7/30/90 etc); other
+     *  stats are always as-of-now regardless of that window. */
+    public AdminDashboardStatsResponse getDashboardStats(int trendDays) {
+        long totalUsers = userRepo.count();
+        Instant now = Instant.now();
+        Instant sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
+        Instant thirtyDaysAgo = now.minus(30, ChronoUnit.DAYS);
+        Instant trendSince = now.minus(trendDays, ChronoUnit.DAYS);
+
+        long usersWithSkills = userSkillRepo.countDistinctUsers();
+        double avgSkillsPerUser = usersWithSkills == 0
+                ? 0.0
+                : (double) totalSkillOwnershipRows() / usersWithSkills;
+
+        List<SkillPopularityResponse> topSkills = userSkillRepo
+                .findTopSkills(org.springframework.data.domain.PageRequest.of(0, 5))
+                .stream()
+                .map(sc -> skillRepo.findById(sc.getSkillId())
+                        .map(skill -> SkillPopularityResponse.builder()
+                                .skillId(skill.getId())
+                                .name(skill.getName())
+                                .userCount(sc.getCnt())
+                                .build())
+                        .orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        return AdminDashboardStatsResponse.builder()
+                .totalUsers(totalUsers)
+                .newUsersLast7Days(userRepo.countByCreatedAtAfter(sevenDaysAgo))
+                .newUsersLast30Days(userRepo.countByCreatedAtAfter(thirtyDaysAgo))
+                .totalProjects(projectRepo.count())
+                .openProjects(projectRepo.countByStatus(ProjectStatus.OPEN))
+                .completedProjects(projectRepo.countByStatus(ProjectStatus.COMPLETED))
+                .totalSkills(skillRepo.count())
+                .totalCareerRoles(roleRepo.count())
+                .totalAchievements(achievementRepo.count())
+                .achievementsUnlockedCount(userAchievementRepo.count())
+                .avgSkillsPerUser(Math.round(avgSkillsPerUser * 100.0) / 100.0)
+                .topSkills(topSkills)
+                .userSignupTrend(signupTrend(trendSince))
+                .recentSignups(getRecentSignups(5))
+                .build();
+    }
+
+    /** Just the signup-trend series, for the dashboard's day-range switcher
+     *  (7d/30d/90d) to refresh without re-fetching the whole dashboard. */
+    public List<DailyCountResponse> getSignupTrend(int days) {
+        return signupTrend(Instant.now().minus(days, ChronoUnit.DAYS));
+    }
+
+    /** The most recently joined users, newest first — powers the "Recent
+     *  Signups" panel on the dashboard. */
+    public List<RecentUserResponse> getRecentSignups(int limit) {
+        return userRepo.findAll(org.springframework.data.domain.PageRequest.of(0, limit,
+                        Sort.by(Sort.Direction.DESC, "createdAt")))
+                .stream()
+                .map(u -> RecentUserResponse.builder()
+                        .id(u.getId())
+                        .name(u.getName())
+                        .email(u.getEmail())
+                        .avatarUrl(u.getAvatarUrl())
+                        .createdAt(u.getCreatedAt())
+                        .build())
+                .toList();
+    }
+
+    private List<DailyCountResponse> signupTrend(Instant since) {
+        return userRepo.signupTrendSince(since).stream()
+                .map(row -> DailyCountResponse.builder()
+                        .date(row.date())
+                        .count(row.count())
+                        .build())
+                .toList();
+    }
+
+    /** Total rows in user_skills — i.e. sum of skills owned across all users. */
+    private long totalSkillOwnershipRows() {
+        return userSkillRepo.count();
+    }
     // USER MANAGEMENT
     public List<UserResponse> listAllUsers() {
         return userRepo.findAll().stream().map(UserResponse::from).toList();
     }
 
     @Transactional
-    public UserResponse setAdminFlag(Long userId, boolean isAdmin) {
+    public UserResponse setAdminFlag(Long userId, boolean isAdmin, Long requestingUserId) {
+        if (!isAdmin && userId.equals(requestingUserId)) {
+            throw new IllegalArgumentException("You can't revoke your own admin access.");
+        }
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                     "User not found: " + userId));
         user.setAdmin(isAdmin);
+        return UserResponse.from(userRepo.save(user));
+    }
+
+    @Transactional
+    public UserResponse setActiveFlag(Long userId, boolean active, Long requestingUserId) {
+        if (!active && userId.equals(requestingUserId)) {
+            throw new IllegalArgumentException("You can't deactivate your own account.");
+        }
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "User not found: " + userId));
+        user.setActive(active);
         return UserResponse.from(userRepo.save(user));
     }
 
@@ -328,6 +533,12 @@ public class AdminService {
                     "User not found for UID: " + firebaseUid));
         user.setAdmin(true);
         return UserResponse.from(userRepo.save(user));
+    }
+
+    /** Resolves the DB id behind a Firebase UID — used by the controller to
+     *  find "who is making this request" for the self-lockout checks above. */
+    public Long resolveUserId(String firebaseUid) {
+        return userRepo.findByFirebaseUid(firebaseUid).map(User::getId).orElse(null);
     }
 
 

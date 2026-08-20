@@ -2,22 +2,22 @@ package com.skillpath.controller;
 
 import com.skillpath.dto.ApiResponse;
 import com.skillpath.dto.request.*;
-import com.skillpath.dto.response.BranchRequirementResponse;
-import com.skillpath.dto.response.AchievementDeletionResult;
-import com.skillpath.dto.response.AdminAchievementResponse;
-import com.skillpath.dto.response.SkillResponse;
-import com.skillpath.dto.response.UserResponse;
+import com.skillpath.dto.response.*;
 import com.skillpath.model.CareerRole.CareerRole;
 import com.skillpath.model.RoleBranch.RoleBranch;
 import com.skillpath.security.FirebasePrincipal;
 import com.skillpath.service.AdminService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -72,6 +72,13 @@ public class AdminController {
 
 
     // CAREER ROLE MANAGEMENT
+    /** All roles with per-role stats (required-skill count, popularity) —
+     *  used by the admin Roles list instead of the plain public list. */
+    @GetMapping("/career-roles")
+    public ResponseEntity<ApiResponse<List<AdminRoleSummaryResponse>>> listCareerRoles() {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.listRolesWithStats()));
+    }
+
     @GetMapping("/career-roles/{roleId}")
     public ResponseEntity<ApiResponse<CareerRole>> getCareerRole(@PathVariable Long roleId) {
         return ResponseEntity.ok(ApiResponse.ok(adminService.getCareerRole(roleId)));
@@ -155,17 +162,72 @@ public class AdminController {
     }
 
     // USER MANAGEMENT
+    /** Paginated + searchable + filterable by status (ALL/ADMIN/ACTIVE/INACTIVE).
+     *  Sortable by name, email, or createdAt (default: createdAt desc). */
     @GetMapping("/users")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> listUsers() {
-        return ResponseEntity.ok(ApiResponse.ok(adminService.listAllUsers()));
+    public ResponseEntity<ApiResponse<Page<AdminUserSummaryResponse>>> listUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "ALL") String status,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDir) {
+        Set<String> allowedSort = Set.of("name", "email", "createdAt");
+        String safeSortBy = allowedSort.contains(sortBy) ? sortBy : "createdAt";
+        Sort.Direction direction = "ASC".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        return ResponseEntity.ok(ApiResponse.ok(
+                adminService.listUsers(q, status, PageRequest.of(page, size, Sort.by(direction, safeSortBy)))));
+    }
+
+    /** Aggregate stats for the admin Users screen (counts, breakdowns, signup trend). */
+    @GetMapping("/users/analytics")
+    public ResponseEntity<ApiResponse<AdminUserAnalyticsResponse>> userAnalytics() {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getUserAnalytics()));
     }
 
     @PatchMapping("/users/{userId}/admin")
     public ResponseEntity<ApiResponse<UserResponse>> setAdmin(
             @PathVariable Long userId,
-            @RequestBody java.util.Map<String, Boolean> body) {
+            @RequestBody java.util.Map<String, Boolean> body,
+            Authentication auth) {
         boolean isAdmin = Boolean.TRUE.equals(body.get("admin"));
-        return ResponseEntity.ok(ApiResponse.ok(adminService.setAdminFlag(userId, isAdmin)));
+        Long requestingUserId = currentUserId(auth);
+        return ResponseEntity.ok(ApiResponse.ok(adminService.setAdminFlag(userId, isAdmin, requestingUserId)));
+    }
+
+    /** Deactivate/reactivate a user. Deactivated users are rejected at
+     *  sign-in (see FirebaseTokenFilter) but keep their data. */
+    @PatchMapping("/users/{userId}/active")
+    public ResponseEntity<ApiResponse<UserResponse>> setActive(
+            @PathVariable Long userId,
+            @RequestBody java.util.Map<String, Boolean> body,
+            Authentication auth) {
+        boolean active = Boolean.TRUE.equals(body.get("active"));
+        Long requestingUserId = currentUserId(auth);
+        return ResponseEntity.ok(ApiResponse.ok(adminService.setActiveFlag(userId, active, requestingUserId)));
+    }
+
+    private Long currentUserId(Authentication auth) {
+        FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
+        return adminService.resolveUserId(p.getUid());
+    }
+
+    // DASHBOARD / OVERVIEW
+    /** Platform-wide stats for the admin overview screen.
+     *  [days] controls the signup-trend window (defaults to 30). */
+    @GetMapping("/dashboard/stats")
+    public ResponseEntity<ApiResponse<AdminDashboardStatsResponse>> dashboardStats(
+            @RequestParam(defaultValue = "30") int days) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getDashboardStats(days)));
+    }
+
+    /** Just the signup-trend chart data — lets the dashboard's day-range
+     *  switcher (7d/30d/90d) refresh only the chart instead of reloading
+     *  every stat on the page. */
+    @GetMapping("/dashboard/signup-trend")
+    public ResponseEntity<ApiResponse<List<DailyCountResponse>>> signupTrend(
+            @RequestParam(defaultValue = "30") int days) {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.getSignupTrend(days)));
     }
 
     // ONE-TIME BOOTSTRAP — promotes the calling (already-authenticated) user

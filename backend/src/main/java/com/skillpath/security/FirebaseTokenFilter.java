@@ -2,10 +2,11 @@ package com.skillpath.security;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
+import com.skillpath.repository.UserRepository;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
-import
-org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -13,7 +14,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.*;
 import java.util.List;
 @Component
+@RequiredArgsConstructor
 public class FirebaseTokenFilter extends OncePerRequestFilter {
+    private final UserRepository userRepo;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -27,6 +31,19 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
         try {
             FirebaseToken decoded = FirebaseAuth.getInstance()
                                     .verifyIdToken(header.substring(7));
+            // Reject deactivated accounts
+            boolean deactivated = userRepo.findByFirebaseUid(decoded.getUid())
+                    .map(u -> !u.isActive())
+                    .orElse(false);
+            if (deactivated) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                try (PrintWriter w = response.getWriter()) {
+                    w.write("{\"success\":false,\"message\":\"This account has been deactivated.\"}");
+                }
+                return;
+            }
+
             var auth = new UsernamePasswordAuthenticationToken(new FirebasePrincipal(decoded.getUid(),
                                                                 decoded.getEmail()),
                                                                 null,
