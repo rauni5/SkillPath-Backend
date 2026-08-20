@@ -40,6 +40,7 @@ public class CareerGoalService {
         goal.setBranchId(resolvedBranchId);
         goal.setSetAt(Instant.now());
         goalRepo.save(goal);
+        roadmapService.generateRoadmap(userId);
     }
 
     @Transactional
