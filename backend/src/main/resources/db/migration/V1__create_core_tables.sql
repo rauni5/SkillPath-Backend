@@ -48,9 +48,17 @@ CREATE TABLE role_required_skills (
  importance INT NOT NULL CHECK (importance BETWEEN 1 AND 10),
  PRIMARY KEY (role_id, skill_id)
 );
+CREATE TABLE role_branches (
+ id BIGSERIAL PRIMARY KEY,
+ role_id BIGINT NOT NULL REFERENCES career_roles(id) ON DELETE CASCADE,
+ name VARCHAR(100) NOT NULL,
+ description TEXT,
+ UNIQUE(role_id, name)
+);
 CREATE TABLE user_career_goals (
  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
  role_id BIGINT NOT NULL REFERENCES career_roles(id),
+ branch_id BIGINT REFERENCES role_branches(id),
  set_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE projects (
@@ -128,6 +136,12 @@ CREATE TABLE skill_check_attempts (
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  submitted_at TIMESTAMPTZ
 );
+CREATE TABLE branch_required_skills (
+ branch_id BIGINT NOT NULL REFERENCES role_branches(id) ON DELETE CASCADE,
+ skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+ importance INT NOT NULL CHECK (importance BETWEEN 1 AND 10),
+ PRIMARY KEY (branch_id, skill_id)
+);
 CREATE TABLE dashboard_summaries (
  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
  content TEXT NOT NULL,
@@ -170,6 +184,40 @@ CREATE TABLE user_streaks (
  longest_streak INT NOT NULL DEFAULT 0,
  last_activity_date DATE
 );
+CREATE TABLE project_posts (
+ id BIGSERIAL PRIMARY KEY,
+ project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+ channel VARCHAR(10) NOT NULL CHECK (channel IN ('PUBLIC','TEAM')),
+ author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ tag VARCHAR(20) NOT NULL DEFAULT 'GENERAL' CHECK (tag IN ('GENERAL','QUESTION','UPDATE','ANNOUNCEMENT')),
+ title VARCHAR(200) NOT NULL,
+ body TEXT NOT NULL,
+ like_count INT NOT NULL DEFAULT 0,
+ comment_count INT NOT NULL DEFAULT 0,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE project_comments (
+ id BIGSERIAL PRIMARY KEY,
+ post_id BIGINT NOT NULL REFERENCES project_posts(id) ON DELETE CASCADE,
+ author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ body TEXT NOT NULL,
+ like_count INT NOT NULL DEFAULT 0,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE project_post_likes (
+ post_id BIGINT NOT NULL REFERENCES project_posts(id) ON DELETE CASCADE,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ PRIMARY KEY (post_id, user_id)
+);
+CREATE TABLE project_comment_likes (
+ comment_id BIGINT NOT NULL REFERENCES project_comments(id) ON DELETE CASCADE,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ PRIMARY KEY (comment_id, user_id)
+);
+CREATE INDEX idx_project_posts_board ON project_posts(project_id, channel, created_at);
+CREATE INDEX idx_project_comments_post ON project_comments(post_id, created_at);
 CREATE INDEX idx_user_achievements_user ON user_achievements(user_id);
 CREATE INDEX idx_roadmap_chat_sessions_user ON roadmap_chat_sessions(user_id, created_at);
 CREATE INDEX idx_roadmap_chat_messages_session ON roadmap_chat_messages(session_id, created_at);

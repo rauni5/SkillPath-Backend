@@ -3,10 +3,13 @@ package com.skillpath.service;
 import com.skillpath.dto.request.*;
 import com.skillpath.dto.response.*;
 import com.skillpath.exception.ResourceNotFoundException;
+import com.skillpath.model.BranchRequiredSkill.BranchRequiredSkill;
+import com.skillpath.model.BranchRequiredSkill.BranchRequiredSkillId;
+import com.skillpath.dto.response.AchievementDeletionResult;
+import com.skillpath.dto.response.AdminAchievementResponse;
 import com.skillpath.model.Achievement.Achievement;
 import com.skillpath.model.CareerRole.CareerRole;
-import com.skillpath.model.RoleRequiredSkill.RoleRequiredSkill;
-import com.skillpath.model.RoleRequiredSkill.RoleRequiredSkillId;
+import com.skillpath.model.RoleBranch.RoleBranch;
 import com.skillpath.model.Skill.Skill;
 import com.skillpath.model.SkillDependency.SkillDependency;
 import com.skillpath.model.SkillDependency.SkillDependencyId;
@@ -35,7 +38,8 @@ public class AdminService {
     private final SkillRepository             skillRepo;
     private final SkillDependencyRepository   depRepo;
     private final CareerRoleRepository        roleRepo;
-    private final RoleRequiredSkillRepository roleSkillRepo;
+    private final RoleBranchRepository        branchRepo;
+    private final BranchRequiredSkillRepository branchSkillRepo;
     private final UserRepository              userRepo;
     private final SkillTrieService            trieService;
     private final AchievementRepository       achievementRepo;
@@ -48,7 +52,26 @@ public class AdminService {
     // dashboard stopped calling it. The service class is still here if you
     // want to bring it back later; just re-add the field + call below.
 
-    
+    // SKILL MANAGEMENT
+    @Transactional
+    public SkillResponse createSkill(CreateSkillRequest req) {
+        if (skillRepo.existsByNameIgnoreCase(req.getName()))
+            throw new IllegalArgumentException(
+                "A skill named '" + req.getName() + "' already exists.");
+
+        Skill skill = Skill.builder()
+                .name(req.getName())
+                .category(req.getCategory())
+                .description(req.getDescription())
+                .build();
+        Skill saved = skillRepo.save(skill);
+
+        // Keep the live Trie in sync — no restart required
+        trieService.insertSkill(saved.getName(), saved.getId());
+
+        return SkillResponse.from(saved);
+    }
+
     public SkillResponse getSkill(Long skillId) {
         return skillRepo.findById(skillId)
                 .map(SkillResponse::from)
@@ -86,31 +109,11 @@ public class AdminService {
             skillRepo.deleteById(skillId);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             throw new IllegalStateException(
-                "Can't delete this skill — it's still required by at least one project. " +
-                "Remove it from those projects first.");
+                "Can't delete this skill — it's still required by at least one project or branch. " +
+                "Remove it from those first.");
         }
     }
 
-    @Transactional
-    public SkillResponse createSkill(CreateSkillRequest req) {
-        if (skillRepo.existsByNameIgnoreCase(req.getName()))
-            throw new IllegalArgumentException(
-                "A skill named '" + req.getName() + "' already exists.");
-
-        Skill skill = Skill.builder()
-                .name(req.getName())
-                .category(req.getCategory())
-                .description(req.getDescription())
-                .build();
-        Skill saved = skillRepo.save(skill);
-
-        // Keep the live Trie in sync — no restart required
-        trieService.insertSkill(saved.getName(), saved.getId());
-
-        return SkillResponse.from(saved);
-    }
-
-    
     @Transactional
     public void addDependency(Long skillId, Long prerequisiteId) {
         if (!skillRepo.existsById(skillId))
@@ -137,7 +140,6 @@ public class AdminService {
                 .build());
     }
 
-
     @Transactional
     public void removeDependency(Long skillId, Long prerequisiteId) {
         SkillDependencyId id = new SkillDependencyId(skillId, prerequisiteId);
@@ -158,6 +160,7 @@ public class AdminService {
                 .toList();
     }
 
+    // CAREER ROLE MANAGEMENT
     @Transactional
     public CareerRole createCareerRole(CreateCareerRoleRequest req) {
         CareerRole role = CareerRole.builder()
@@ -224,52 +227,109 @@ public class AdminService {
         }
     }
 
+    // BRANCH MANAGEMENT — every role's actual required skills now live
+    // exclusively on its branches, not on the role directly.
     @Transactional
-    public void addRoleRequirement(Long roleId, AddRequirementRequest req) {
+    public RoleBranch createBranch(Long roleId, CreateBranchRequest req) {
         if (!roleRepo.existsById(roleId))
             throw new ResourceNotFoundException("Career role not found: " + roleId);
+        boolean nameTaken = branchRepo.findByRoleId(roleId).stream()
+                .anyMatch(b -> b.getName().equalsIgnoreCase(req.getName()));
+        if (nameTaken)
+            throw new IllegalArgumentException(
+                "A branch named '" + req.getName() + "' already exists for this role.");
+        RoleBranch branch = RoleBranch.builder()
+                .roleId(roleId)
+                .name(req.getName())
+                .description(req.getDescription())
+                .build();
+        return branchRepo.save(branch);
+    }
+
+    public List<RoleBranch> getBranches(Long roleId) {
+        if (!roleRepo.existsById(roleId))
+            throw new ResourceNotFoundException("Career role not found: " + roleId);
+        return branchRepo.findByRoleId(roleId);
+    }
+
+    public RoleBranch getBranch(Long branchId) {
+        return branchRepo.findById(branchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found: " + branchId));
+    }
+
+    @Transactional
+    public RoleBranch updateBranch(Long branchId, CreateBranchRequest req) {
+        RoleBranch branch = branchRepo.findById(branchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branch not found: " + branchId));
+        boolean nameTaken = branchRepo.findByRoleId(branch.getRoleId()).stream()
+                .anyMatch(b -> !b.getId().equals(branchId) && b.getName().equalsIgnoreCase(req.getName()));
+        if (nameTaken)
+            throw new IllegalArgumentException(
+                "A branch named '" + req.getName() + "' already exists for this role.");
+        branch.setName(req.getName());
+        branch.setDescription(req.getDescription());
+        return branchRepo.save(branch);
+    }
+
+    @Transactional
+    public void deleteBranch(Long branchId) {
+        if (!branchRepo.existsById(branchId))
+            throw new ResourceNotFoundException("Branch not found: " + branchId);
+        try {
+            branchRepo.deleteById(branchId);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new IllegalStateException(
+                "Can't delete this branch — at least one user currently has it selected as " +
+                "their career goal. That must change first.");
+        }
+    }
+
+    @Transactional
+    public void addBranchRequirement(Long branchId, AddRequirementRequest req) {
+        if (!branchRepo.existsById(branchId))
+            throw new ResourceNotFoundException("Branch not found: " + branchId);
         if (!skillRepo.existsById(req.getSkillId()))
             throw new ResourceNotFoundException("Skill not found: " + req.getSkillId());
 
-        boolean exists = roleSkillRepo.findByRoleId(roleId).stream()
+        boolean exists = branchSkillRepo.findByBranchId(branchId).stream()
                 .anyMatch(r -> r.getSkillId().equals(req.getSkillId()));
         if (exists)
             throw new IllegalArgumentException(
-                "This skill is already a requirement for this role.");
+                "This skill is already a requirement for this branch.");
 
-        roleSkillRepo.save(RoleRequiredSkill.builder()
-                .roleId(roleId)
+        branchSkillRepo.save(BranchRequiredSkill.builder()
+                .branchId(branchId)
                 .skillId(req.getSkillId())
                 .importance(req.getImportance())
                 .build());
     }
 
     @Transactional
-    public void updateRoleRequirement(Long roleId, Long skillId, AddRequirementRequest req) {
-        RoleRequiredSkillId id = new RoleRequiredSkillId(roleId, skillId);
-        RoleRequiredSkill existing = roleSkillRepo.findById(id)
+    public void updateBranchRequirement(Long branchId, Long skillId, AddRequirementRequest req) {
+        BranchRequiredSkillId id = new BranchRequiredSkillId(branchId, skillId);
+        BranchRequiredSkill existing = branchSkillRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                    "Requirement not found for role " + roleId + " / skill " + skillId));
+                    "Requirement not found for branch " + branchId + " / skill " + skillId));
         existing.setImportance(req.getImportance());
-        roleSkillRepo.save(existing);
+        branchSkillRepo.save(existing);
     }
 
     @Transactional
-    public void removeRoleRequirement(Long roleId, Long skillId) {
-        RoleRequiredSkillId id = new RoleRequiredSkillId(roleId, skillId);
-        if (!roleSkillRepo.existsById(id))
+    public void removeBranchRequirement(Long branchId, Long skillId) {
+        BranchRequiredSkillId id = new BranchRequiredSkillId(branchId, skillId);
+        if (!branchSkillRepo.existsById(id))
             throw new ResourceNotFoundException(
-                "Requirement not found for role " + roleId + " / skill " + skillId);
-        roleSkillRepo.deleteById(id);
+                "Requirement not found for branch " + branchId + " / skill " + skillId);
+        branchSkillRepo.deleteById(id);
     }
 
-    public List<RoleRequirementResponse> getRoleRequirements(Long roleId) {
-        if (!roleRepo.existsById(roleId))
-            throw new ResourceNotFoundException("Career role not found: " + roleId);
-        return roleSkillRepo.findByRoleId(roleId).stream()
+    public List<BranchRequirementResponse> getBranchRequirements(Long branchId) {
+        if (!branchRepo.existsById(branchId))
+            throw new ResourceNotFoundException("Branch not found: " + branchId);
+        return branchSkillRepo.findByBranchId(branchId).stream()
                 .map(r -> {
                     Skill skill = skillRepo.findById(r.getSkillId()).orElseThrow();
-                    return RoleRequirementResponse.builder()
+                    return BranchRequirementResponse.builder()
                             .skillId(skill.getId())
                             .name(skill.getName())
                             .category(skill.getCategory().name())
@@ -429,6 +489,9 @@ public class AdminService {
     /** Total rows in user_skills — i.e. sum of skills owned across all users. */
     private long totalSkillOwnershipRows() {
         return userSkillRepo.count();
+    // USER MANAGEMENT
+    public List<UserResponse> listAllUsers() {
+        return userRepo.findAll().stream().map(UserResponse::from).toList();
     }
 
     @Transactional

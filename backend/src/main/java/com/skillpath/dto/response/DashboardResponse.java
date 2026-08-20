@@ -7,6 +7,7 @@ public class DashboardResponse {
     private int roadmapCompletedSteps;
     private int roadmapTotalSteps;
     private String careerRoleName;
+    private String branchName;
     private List<ProjectResponse> activeProjects;
     private List<SkillResponse> nextSkillsToLearn;
 }

@@ -4,6 +4,8 @@ import java.util.List;
 @Getter @Builder
 public class GapAnalysisResponse {
     private String careerRoleName;
+    private Long branchId;
+    private String branchName;
     private int progressPercent;
     private int knownSkillCount;
     private int requiredSkillCount;

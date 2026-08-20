@@ -9,6 +9,10 @@ public class UserCareerGoal {
  private Long userId;
  @Column(name = "role_id") 
  private Long roleId;
+ /** Every role now requires a branch to be selectable — null only means
+  * "not yet resolved," which setGoal always fills in before saving. */
+ @Column(name = "branch_id")
+ private Long branchId;
  @Column(name = "set_at") @Builder.Default
  private Instant setAt = Instant.now();
 }
