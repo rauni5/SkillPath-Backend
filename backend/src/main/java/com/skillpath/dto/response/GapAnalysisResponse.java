@@ -9,9 +9,16 @@ public class GapAnalysisResponse {
     private int progressPercent;
     private int knownSkillCount;
     private int requiredSkillCount;
+    private List<KnownSkill> knownSkills;
     private List<MissingSkill> missingSkills;
     @Getter @Builder @AllArgsConstructor
     public static class MissingSkill {
+        private Long id;
+        private String name;
+        private int importance;
+    }
+    @Getter @Builder @AllArgsConstructor
+    public static class KnownSkill {
         private Long id;
         private String name;
         private int importance;
