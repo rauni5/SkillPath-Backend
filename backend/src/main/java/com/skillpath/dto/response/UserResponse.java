@@ -19,7 +19,6 @@ public class UserResponse {
     private String avatarUrl;
     private Instant createdAt;
     private boolean admin;
-    private boolean active;
     public static UserResponse from(User u) {
         return UserResponse.builder()
         .id(u.getId())
@@ -36,7 +35,6 @@ public class UserResponse {
         .avatarUrl(u.getAvatarUrl())
         .createdAt(u.getCreatedAt())
         .admin(u.isAdmin())
-        .active(u.isActive())
         .build();
     }
 }
