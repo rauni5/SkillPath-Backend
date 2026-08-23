@@ -6,6 +6,7 @@ import com.skillpath.dto.response.*;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.Certification.Certification;
 import com.skillpath.model.PortfolioItem.PortfolioItem;
+import com.skillpath.model.Project.Project;
 import com.skillpath.model.Skill.Skill;
 import com.skillpath.model.User.User;
 import com.skillpath.model.UserSkill.UserSkill;
@@ -32,6 +33,7 @@ public class PortfolioService {
     private final ProjectMemberRepository memberRepo;
     private final CareerGoalService       goalService;
     private final CertificationRepository certRepo;
+    private final ProjectRequiredSkillRepository reqSkillRepo;
 
     public List<PortfolioItemResponse> getPortfolio(Long userId) {
         if (!userRepo.existsById(userId))
@@ -150,7 +152,8 @@ public class PortfolioService {
      * progress, skills with proficiency, projects owned/joined, and any
      * manually-added or auto-generated portfolio items.
      */
-    public PortfolioResponse getSummary(Long userId) {
+    public PortfolioResponse getSummary(Long userId, Long viewerId) {
+        boolean isSelf = userId.equals(viewerId);
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
@@ -174,10 +177,10 @@ public class PortfolioService {
         // safe against that changing later).
         Map<Long, ProjectResponse> projectsById = new LinkedHashMap<>();
         projectRepo.findByOwnerId(userId, org.springframework.data.domain.Pageable.unpaged())
-                .forEach(p -> projectsById.put(p.getId(), ProjectResponse.from(p)));
+                .forEach(p -> projectsById.put(p.getId(), toProjectResponse(p)));
         memberRepo.findByUserIdAndStatus(userId, MemberStatus.ACCEPTED).forEach(pm ->
                 projectRepo.findById(pm.getProjectId())
-                        .ifPresent(p -> projectsById.putIfAbsent(p.getId(), ProjectResponse.from(p))));
+                        .ifPresent(p -> projectsById.putIfAbsent(p.getId(), toProjectResponse(p))));
 
         List<PortfolioItemResponse> items = getPortfolio(userId);
         List<CertificationResponse> certifications = certRepo.findByUserIdOrderByEarnedOnDesc(userId)
@@ -187,7 +190,7 @@ public class PortfolioService {
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .phoneNumber(user.getPhoneNumber())
+                .phoneNumber(isSelf ? user.getPhoneNumber() : null)
                 .githubUrl(user.getGithubUrl())
                 .linkedinUrl(user.getLinkedinUrl())
                 .location(user.getLocation())
@@ -215,5 +218,19 @@ public class PortfolioService {
                 .category(skill.getCategory())
                 .proficiency(us.getProficiency())
                 .build();
+    }
+
+    private ProjectResponse toProjectResponse(Project p) {
+        ProjectResponse resp = ProjectResponse.from(p);
+        List<SkillResponse> skills = reqSkillRepo.findByProjectId(p.getId()).stream()
+                .map(rs -> skillRepo.findById(rs.getSkillId()).map(SkillResponse::from).orElse(null))
+                .filter(s -> s != null)
+                .toList();
+        resp.setRequiredSkills(skills);
+        userRepo.findById(p.getOwnerId()).ifPresent(owner -> {
+            resp.setOwnerName(owner.getName());
+            resp.setOwnerAvatarUrl(owner.getAvatarUrl());
+        });
+        return resp;
     }
 }

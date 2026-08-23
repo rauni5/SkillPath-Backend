@@ -78,6 +78,8 @@ public class GamificationService {
                     .category(a.getCategory())
                     .unlocked(meetsCriteria)
                     .unlockedAt(unlockedAtById.get(a.getId()))
+                    .criteriaType(a.getCriteriaType())
+                    .criteriaValue(a.getCriteriaValue())
                     .build());
         }
         return result;

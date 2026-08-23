@@ -1,13 +1,13 @@
-package com.skillpath.model.RoadmapChatMessage;
+package com.skillpath.model.AssistantMessage;
 import com.skillpath.model.enums.MessageRole;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.Instant;
 
-@Entity @Table(name = "roadmap_chat_messages")
+@Entity @Table(name = "Assistant_messages")
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
-public class RoadmapChatMessage {
+public class AssistantMessage {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     @Column(name = "session_id", nullable = false) private Long sessionId;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private MessageRole role;
