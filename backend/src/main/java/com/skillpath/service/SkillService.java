@@ -2,6 +2,7 @@ package com.skillpath.service;
 import com.skillpath.algorithm.graph.SkillGraph;
 import com.skillpath.dto.request.AddSkillRequest;
 import com.skillpath.dto.response.SkillResponse;
+import com.skillpath.dto.response.SkillWithProficiencyResponse;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.UserSkill.UserSkill;
 import com.skillpath.model.UserSkill.UserSkillId;
@@ -26,10 +27,16 @@ public class SkillService {
         return skillRepo.findByNameContainingIgnoreCase(prefix)
                 .stream().map(SkillResponse::from).toList();
     }
-    public List<SkillResponse> getUserSkills(Long userId) {
+    public List<SkillWithProficiencyResponse> getUserSkills(Long userId) {
         return userSkillRepo.findByUserId(userId).stream()
                     .map(us -> skillRepo.findById(us.getSkillId())
-                    .map(SkillResponse::from).orElseThrow())
+                    .map(skill -> SkillWithProficiencyResponse.builder()
+                        .id(skill.getId())
+                        .name(skill.getName())
+                        .category(skill.getCategory())
+                        .proficiency(us.getProficiency())
+                        .build())
+                    .orElseThrow())
                 .toList();
     }
     @Transactional

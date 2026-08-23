@@ -291,6 +291,10 @@ public class ProjectService {
         ProjectResponse resp = ProjectResponse.from(p);
         resp.setRequiredSkills(skills);
         resp.setRequiredRoles(roles);
+        userRepo.findById(p.getOwnerId()).ifPresent(owner -> {
+            resp.setOwnerName(owner.getName());
+            resp.setOwnerAvatarUrl(owner.getAvatarUrl());
+        });
         return resp;
     }
     @Transactional

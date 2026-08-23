@@ -19,6 +19,14 @@ public class GlobalExceptionHandler {
  public ResponseEntity<ApiResponse<Void>> aiService(AiServiceException e) {
     return ResponseEntity.status(502).body(ApiResponse.error(e.getMessage()));
  }
+ @ExceptionHandler(StorageException.class)
+ public ResponseEntity<ApiResponse<Void>> storage(StorageException e) {
+    return ResponseEntity.status(502).body(ApiResponse.error(e.getMessage()));
+ }
+ @ExceptionHandler(IllegalArgumentException.class)
+ public ResponseEntity<ApiResponse<Void>> badRequest(IllegalArgumentException e) {
+    return ResponseEntity.status(400).body(ApiResponse.error(e.getMessage()));
+ }
  @ExceptionHandler(MethodArgumentNotValidException.class)
  public ResponseEntity<ApiResponse<Void>> validation(MethodArgumentNotValidException e) {
     String msg = e.getBindingResult().getFieldErrors().stream()

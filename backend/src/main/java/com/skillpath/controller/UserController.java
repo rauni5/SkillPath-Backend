@@ -18,27 +18,32 @@ import com.skillpath.security.FirebasePrincipal;
 import com.skillpath.service.PortfolioService;
 import com.skillpath.service.ProjectService;
 import com.skillpath.service.UserService;
+import com.skillpath.storage.SupabaseStorageClient;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import java.io.IOException;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 @RestController @RequestMapping("/api/v1/users") @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
     private final ProjectService projectService;
     private final PortfolioService portfolioService;
+    private final SupabaseStorageClient storageClient;
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(userService.findById(id)));
     }
     @GetMapping("/{id}/portfolio")
     public ResponseEntity<ApiResponse<PortfolioResponse>> portfolio(@PathVariable Long id, Authentication auth) {
-        requireSelf(id, auth);
-        return ResponseEntity.ok(ApiResponse.ok(portfolioService.getSummary(id)));
+        Long viewerId = resolveCallerId(auth);
+        return ResponseEntity.ok(ApiResponse.ok(portfolioService.getSummary(id, viewerId)));
     }
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<UserSearchResultResponse>>> search(
@@ -55,6 +60,25 @@ public class UserController {
             @PathVariable Long id, @Valid @RequestBody UpdateProfileRequest req, Authentication auth) {
         requireSelf(id, auth);
         return ResponseEntity.ok(ApiResponse.ok(userService.updateProfile(id,req)));
+    }
+    @PostMapping(value = "/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<UserResponse>> uploadAvatar(
+            @PathVariable Long id, @RequestParam("file") MultipartFile file, Authentication auth) throws IOException {
+        requireSelf(id, auth);
+
+        if (file.isEmpty()) throw new IllegalArgumentException("No image provided.");
+        if (file.getSize() > 5 * 1024 * 1024) throw new IllegalArgumentException("Image must be under 5MB.");
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/"))
+            throw new IllegalArgumentException("File must be an image.");
+
+        String extension = "image/png".equals(contentType) ? "png" : "jpg";
+        String path = "user-" + id + "." + extension;
+        String url = storageClient.uploadAvatar(path, file.getBytes(), contentType);
+
+        UpdateProfileRequest avatarUpdate = new UpdateProfileRequest();
+        avatarUpdate.setAvatarUrl(url);
+        return ResponseEntity.ok(ApiResponse.ok(userService.updateProfile(id, avatarUpdate)));
     }
     @PostMapping("/{id}/portfolio")
     public ResponseEntity<ApiResponse<PortfolioItemResponse>> addPortfolioItem(
@@ -126,5 +150,9 @@ public class UserController {
         Long callerId = userService.getEntityByFirebaseUid(p.getUid()).getId();
         if (!callerId.equals(pathUserId))
             throw new ForbiddenException("You can only access your own data.");
+    }
+    private Long resolveCallerId(Authentication auth) {
+        FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
+        return userService.getEntityByFirebaseUid(p.getUid()).getId();
     }
 }

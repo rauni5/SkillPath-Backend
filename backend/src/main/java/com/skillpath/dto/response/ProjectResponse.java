@@ -16,6 +16,8 @@ public class ProjectResponse {
     private Integer teamSize;
     private ProjectStatus status;
     private Long ownerId;
+    private String ownerName;
+    private String ownerAvatarUrl;
     private List<SkillResponse> requiredSkills;
     private List<CareerRole> requiredRoles;
     private Instant createdAt;
