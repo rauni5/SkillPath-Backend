@@ -84,8 +84,24 @@ public class RoadmapService {
      */
     @Transactional
     public void completeStepsForSkill(Long userId, Long skillId, Proficiency earnedProficiency) {
-        List<RoadmapStep> steps = stepRepo.findByUserIdAndSkillId(userId, skillId);
         Instant now = Instant.now();
+        markStepsDone(userId, skillId, now);
+        upsertUserSkillOrRaise(userId, skillId, earnedProficiency);
+
+        SkillGraph graph = new SkillGraph();
+        depRepo.findAllDependencies().forEach(dep -> {
+            graph.addSkill(dep.getSkillId());
+            graph.addSkill(dep.getPrerequisiteId());
+            graph.addDependency(dep.getSkillId(), dep.getPrerequisiteId());
+        });
+        for (Long prereqId : graph.getAllPrerequisites(skillId)) {
+            upsertUserSkillIfAbsent(userId, prereqId, Proficiency.BEGINNER);
+            markStepsDone(userId, prereqId, now);
+        }
+    }
+
+    private void markStepsDone(Long userId, Long skillId, Instant now) {
+        List<RoadmapStep> steps = stepRepo.findByUserIdAndSkillId(userId, skillId);
         for (RoadmapStep step : steps) {
             if (step.getStatus() != StepStatus.DONE) {
                 step.setStatus(StepStatus.DONE);
@@ -93,7 +109,6 @@ public class RoadmapService {
                 stepRepo.save(step);
             }
         }
-        upsertUserSkillOrRaise(userId, skillId, earnedProficiency);
     }
 
     private void upsertUserSkillIfAbsent(Long userId, Long skillId, Proficiency proficiency) {

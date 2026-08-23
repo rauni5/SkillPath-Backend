@@ -2,6 +2,7 @@ package com.skillpath.controller;
 import com.skillpath.dto.ApiResponse;
 import com.skillpath.dto.request.AddSkillRequest;
 import com.skillpath.dto.response.SkillResponse;
+import com.skillpath.dto.response.SkillWithProficiencyResponse;
 import com.skillpath.repository.SkillRepository;
 import com.skillpath.service.SkillService;
 import com.skillpath.service.SkillTrieService;
@@ -31,7 +32,7 @@ public class SkillController {
     }
 
     @GetMapping("/api/v1/users/{userId}/skills")
-    public ResponseEntity<ApiResponse<List<SkillResponse>>> userSkills(@PathVariable Long userId) {
+    public ResponseEntity<ApiResponse<List<SkillWithProficiencyResponse>>> userSkills(@PathVariable Long userId) {
         return ResponseEntity.ok(ApiResponse.ok(skillService.getUserSkills(userId)));
     }
     @PostMapping("/api/v1/users/{userId}/skills")

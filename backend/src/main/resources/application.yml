@@ -24,6 +24,10 @@ firebase:
 gemini:
   api-key: ${GEMINI_API_KEY:}
   model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
+supabase:
+  url: ${SUPABASE_URL:}
+  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+  avatar-bucket: ${SUPABASE_AVATAR_BUCKET:avatars}
 server:
   port: ${PORT:8080}
 springdoc:
