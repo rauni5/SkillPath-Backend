@@ -12,9 +12,11 @@ import com.skillpath.exception.ForbiddenException;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.Skill.Skill;
 import com.skillpath.model.SkillCheckAttempt.SkillCheckAttempt;
+import com.skillpath.model.SkillCheckQuestionSet.SkillCheckQuestionSet;
 import com.skillpath.model.enums.Proficiency;
 import com.skillpath.model.enums.SkillCheckStatus;
 import com.skillpath.repository.SkillCheckAttemptRepository;
+import com.skillpath.repository.SkillCheckQuestionSetRepository;
 import com.skillpath.repository.SkillRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,13 +24,22 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 @Service @RequiredArgsConstructor
 public class SkillCheckService {
     private static final int QUESTION_COUNT = 5;
     private static final int POINTS_PER_QUESTION = 4; // 5 * 4 = 20, matching the 0-20 scoring scale
 
+    /** How many sets to seed a skill's pool with the first time anyone
+     *  takes its check — after that the pool only grows lazily, one set
+     *  at a time, whenever a user exhausts everything currently in it. */
+    private static final int INITIAL_POOL_SIZE = 3;
+
     private final SkillCheckAttemptRepository attemptRepo;
+    private final SkillCheckQuestionSetRepository questionSetRepo;
     private final SkillRepository skillRepo;
     private final RoadmapService roadmapService;
     private final GeminiClient geminiClient;
@@ -39,6 +50,73 @@ public class SkillCheckService {
         Skill skill = skillRepo.findById(skillId)
                 .orElseThrow(() -> new ResourceNotFoundException("Skill not found: " + skillId));
 
+        SkillCheckQuestionSet chosenSet = pickQuestionSet(userId, skill);
+
+        SkillCheckAttempt attempt = attemptRepo.save(SkillCheckAttempt.builder()
+                .userId(userId).skillId(skillId)
+                .questionSetId(chosenSet.getId())
+                .questionsJson(chosenSet.getQuestionsJson())
+                .status(SkillCheckStatus.GENERATED)
+                .build());
+
+        JsonNode qArray = parseOrFail(chosenSet.getQuestionsJson()).path("questions");
+        List<SkillCheckQuestionResponse> questions = new ArrayList<>();
+        for (int i = 0; i < qArray.size(); i++) {
+            JsonNode q = qArray.get(i);
+            List<String> options = new ArrayList<>();
+            q.path("options").forEach(o -> options.add(o.asText()));
+            questions.add(SkillCheckQuestionResponse.builder()
+                    .index(i)
+                    .question(q.path("question").asText())
+                    .options(options)
+                    .build());
+        }
+
+        return SkillCheckGenerateResponse.builder()
+                .attemptId(attempt.getId())
+                .questions(questions)
+                .build();
+    }
+
+    /**
+     * Picks a question set for this user out of the skill's shared pool,
+     * growing the pool only when genuinely necessary:
+     * - Pool empty (nobody's ever taken this skill's check) → seed it
+     *   with {@link #INITIAL_POOL_SIZE} freshly generated sets.
+     * - Pool has sets this user hasn't seen yet → pick one at random, no
+     *   Gemini call at all.
+     * - User has already attempted every set in the pool → generate one
+     *   new set, add it to the pool for them and everyone after them.
+     */
+    private SkillCheckQuestionSet pickQuestionSet(Long userId, Skill skill) {
+        List<SkillCheckQuestionSet> pool = questionSetRepo.findBySkillId(skill.getId());
+
+        if (pool.isEmpty()) {
+            for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
+                pool.add(generateNewSet(skill));
+            }
+        }
+
+        Set<Long> alreadySeenSetIds = attemptRepo
+                .findByUserIdAndSkillIdAndQuestionSetIdIsNotNull(userId, skill.getId())
+                .stream()
+                .map(SkillCheckAttempt::getQuestionSetId)
+                .collect(Collectors.toSet());
+
+        List<SkillCheckQuestionSet> unseen = pool.stream()
+                .filter(set -> !alreadySeenSetIds.contains(set.getId()))
+                .toList();
+
+        if (!unseen.isEmpty()) {
+            return unseen.get(ThreadLocalRandom.current().nextInt(unseen.size()));
+        }
+
+        // This user has seen every set currently in the pool — grow it by
+        // exactly one, which then becomes available to every other user too.
+        return generateNewSet(skill);
+    }
+
+    private SkillCheckQuestionSet generateNewSet(Skill skill) {
         String systemInstruction =
                 "You are an expert technical assessor. You create fair, practical multiple-choice " +
                 "quizzes that test real understanding of a skill, not trivia. Every question must have " +
@@ -56,28 +134,10 @@ public class SkillCheckService {
         if (!qArray.isArray() || qArray.isEmpty())
             throw new AiServiceException("The AI tutor returned an empty quiz. Please try again.");
 
-        SkillCheckAttempt attempt = attemptRepo.save(SkillCheckAttempt.builder()
-                .userId(userId).skillId(skillId)
+        return questionSetRepo.save(SkillCheckQuestionSet.builder()
+                .skillId(skill.getId())
                 .questionsJson(rawJson)
-                .status(SkillCheckStatus.GENERATED)
                 .build());
-
-        List<SkillCheckQuestionResponse> questions = new ArrayList<>();
-        for (int i = 0; i < qArray.size(); i++) {
-            JsonNode q = qArray.get(i);
-            List<String> options = new ArrayList<>();
-            q.path("options").forEach(o -> options.add(o.asText()));
-            questions.add(SkillCheckQuestionResponse.builder()
-                    .index(i)
-                    .question(q.path("question").asText())
-                    .options(options)
-                    .build());
-        }
-
-        return SkillCheckGenerateResponse.builder()
-                .attemptId(attempt.getId())
-                .questions(questions)
-                .build();
     }
 
     @Transactional

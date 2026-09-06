@@ -39,4 +39,5 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
                        @Param("roleIds") List<Long> roleIds,
                        @Param("q") String q,
                        Pageable pageable);
+ Page<Project> findByIdIn(List<Long> ids, Pageable pageable);
 }

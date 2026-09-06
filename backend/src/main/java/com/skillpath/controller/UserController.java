@@ -1,20 +1,25 @@
 package com.skillpath.controller;
 import com.skillpath.dto.ApiResponse;
 import com.skillpath.dto.request.AddCertificationRequest;
+import com.skillpath.dto.request.AddEducationRequest;
 import com.skillpath.dto.request.AddPortfolioItemRequest;
 import com.skillpath.dto.request.RegisterDeviceTokenRequest;
 import com.skillpath.dto.request.UpdateMemberStatusRequest;
 import com.skillpath.dto.request.UpdateProfileRequest;
 import com.skillpath.dto.response.CertificationResponse;
+import com.skillpath.dto.response.EducationResponse;
 import com.skillpath.dto.response.MembershipStatusResponse;
 import com.skillpath.dto.response.PortfolioItemResponse;
 import com.skillpath.dto.response.PortfolioResponse;
 import com.skillpath.dto.response.ProjectInviteResponse;
+import com.skillpath.dto.response.ProjectJoinRequestResponse;
 import com.skillpath.dto.response.ProjectResponse;
 import com.skillpath.dto.response.UserResponse;
 import com.skillpath.dto.response.UserSearchResultResponse;
+import com.skillpath.dto.response.AppNotificationResponse;
 import com.skillpath.exception.ForbiddenException;
 import com.skillpath.security.FirebasePrincipal;
+import com.skillpath.service.NotificationService;
 import com.skillpath.service.PortfolioService;
 import com.skillpath.service.ProjectService;
 import com.skillpath.service.UserService;
@@ -36,6 +41,7 @@ public class UserController {
     private final ProjectService projectService;
     private final PortfolioService portfolioService;
     private final SupabaseStorageClient storageClient;
+    private final NotificationService notificationService;
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<UserResponse>> getUser(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(userService.findById(id)));
@@ -106,17 +112,64 @@ public class UserController {
         portfolioService.deleteCertification(id, certId);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
+    @PostMapping("/{id}/education")
+    public ResponseEntity<ApiResponse<EducationResponse>> addEducation(
+            @PathVariable Long id, @Valid @RequestBody AddEducationRequest req, Authentication auth) {
+        requireSelf(id, auth);
+        return ResponseEntity.ok(ApiResponse.ok(portfolioService.addEducation(id, req)));
+    }
+    @DeleteMapping("/{id}/education/{eduId}")
+    public ResponseEntity<ApiResponse<Void>> deleteEducation(
+            @PathVariable Long id, @PathVariable Long eduId, Authentication auth) {
+        requireSelf(id, auth);
+        portfolioService.deleteEducation(id, eduId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+    @GetMapping("/{id}/notifications")
+    public ResponseEntity<ApiResponse<List<AppNotificationResponse>>> getNotifications(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            Authentication auth) {
+        requireSelf(id, auth);
+        return ResponseEntity.ok(ApiResponse.ok(notificationService.getNotifications(id, page, size)));
+    }
+    @GetMapping("/{id}/notifications/unread-count")
+    public ResponseEntity<ApiResponse<Long>> getUnreadNotificationCount(
+            @PathVariable Long id, Authentication auth) {
+        requireSelf(id, auth);
+        return ResponseEntity.ok(ApiResponse.ok(notificationService.getUnreadCount(id)));
+    }
+    @PostMapping("/{id}/notifications/{notificationId}/read")
+    public ResponseEntity<ApiResponse<Void>> markNotificationRead(
+            @PathVariable Long id, @PathVariable Long notificationId, Authentication auth) {
+        requireSelf(id, auth);
+        notificationService.markRead(id, notificationId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+    @PostMapping("/{id}/notifications/read-all")
+    public ResponseEntity<ApiResponse<Void>> markAllNotificationsRead(
+            @PathVariable Long id, Authentication auth) {
+        requireSelf(id, auth);
+        notificationService.markAllRead(id);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
     @GetMapping("/{id}/projects")
     public ResponseEntity<ApiResponse<Page<ProjectResponse>>> ownedProjects(
             @PathVariable Long id,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(projectService.getOwnedProjects(id, PageRequest.of(page, size))));
+        return ResponseEntity.ok(ApiResponse.ok(projectService.getMyProjects(id, PageRequest.of(page, size))));
     }
     @GetMapping("/{id}/invites")
     public ResponseEntity<ApiResponse<List<ProjectInviteResponse>>> invites(@PathVariable Long id, Authentication auth) {
         requireSelf(id, auth);
         return ResponseEntity.ok(ApiResponse.ok(projectService.getMyInvites(id)));
+    }
+    @GetMapping("/{id}/join-requests")
+    public ResponseEntity<ApiResponse<List<ProjectJoinRequestResponse>>> joinRequests(@PathVariable Long id, Authentication auth) {
+        requireSelf(id, auth);
+        return ResponseEntity.ok(ApiResponse.ok(projectService.getMyPendingJoinRequests(id)));
     }
     @PatchMapping("/{id}/invites/{projectId}")
     public ResponseEntity<ApiResponse<Void>> respondToInvite(

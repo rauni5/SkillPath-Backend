@@ -5,8 +5,6 @@ import com.skillpath.dto.response.*;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.BranchRequiredSkill.BranchRequiredSkill;
 import com.skillpath.model.BranchRequiredSkill.BranchRequiredSkillId;
-import com.skillpath.dto.response.AchievementDeletionResult;
-import com.skillpath.dto.response.AdminAchievementResponse;
 import com.skillpath.model.Achievement.Achievement;
 import com.skillpath.model.CareerRole.CareerRole;
 import com.skillpath.model.RoleBranch.RoleBranch;
@@ -30,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,7 +46,7 @@ public class AdminService {
     private final ProjectRepository           projectRepo;
     private final UserSkillRepository         userSkillRepo;
     private final UserCareerGoalRepository    userCareerGoalRepo;
-    private final RoleRequiredSkillRepository roleSkillRepo;
+    private final BranchRequiredSkillRepository branchRequiredSkillRepo;
     // NOTE: FirebaseAnalyticsService is intentionally no longer wired in —
     // the GA4 numbers weren't reporting anything useful in practice, so the
     // dashboard stopped calling it. The service class is still here if you
@@ -62,7 +61,7 @@ public class AdminService {
 
         Skill skill = Skill.builder()
                 .name(req.getName())
-                .category(req.getCategory())
+                .category(Skill.normalizeCategory(req.getCategory()))
                 .description(req.getDescription())
                 .build();
         Skill saved = skillRepo.save(skill);
@@ -71,6 +70,12 @@ public class AdminService {
         trieService.insertSkill(saved.getName(), saved.getId());
 
         return SkillResponse.from(saved);
+    }
+
+    /** All categories currently used by at least one skill, for the admin
+     *  UI's category autocomplete — never a fixed/hardcoded list. */
+    public List<String> listSkillCategories() {
+        return skillRepo.findDistinctCategories();
     }
 
     public SkillResponse getSkill(Long skillId) {
@@ -90,7 +95,7 @@ public class AdminService {
                 "A skill named '" + req.getName() + "' already exists.");
 
         skill.setName(req.getName());
-        skill.setCategory(req.getCategory());
+        skill.setCategory(Skill.normalizeCategory(req.getCategory()));
         skill.setDescription(req.getDescription());
         Skill saved = skillRepo.save(skill);
 
@@ -176,16 +181,21 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Career role not found: " + roleId));
     }
 
-    /** All career roles enriched with stats (# of required skills, # of
-     *  users who chose it as their goal) — powers the admin Roles list. */
+    /**
+     * All career roles enriched with stats (# of unique required skills across all branches, 
+     * # of users who chose it as their goal) — powers the admin Roles list.
+     */
     public List<AdminRoleSummaryResponse> listRolesWithStats() {
         List<CareerRole> roles = roleRepo.findAll();
-        Map<Long, Long> requirementCounts = roleSkillRepo.countGroupedByRole().stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        RoleRequiredSkillRepository.CountByRole::getRoleId,
-                        RoleRequiredSkillRepository.CountByRole::getCnt));
+
+        // Map of roleId -> count of distinct required skills across all branches of that role
+        Map<Long, Long> requirementCounts = branchRequiredSkillRepo.countDistinctSkillsGroupedByRole().stream()
+                .collect(Collectors.toMap(
+                        BranchRequiredSkillRepository.CountByRole::getRoleId,
+                        BranchRequiredSkillRepository.CountByRole::getCnt));
+
         Map<Long, Long> popularity = userCareerGoalRepo.countGroupedByRole().stream()
-                .collect(java.util.stream.Collectors.toMap(
+                .collect(Collectors.toMap(
                         UserCareerGoalRepository.CountByRole::getRoleId,
                         UserCareerGoalRepository.CountByRole::getCnt));
 
@@ -333,7 +343,7 @@ public class AdminService {
                     return BranchRequirementResponse.builder()
                             .skillId(skill.getId())
                             .name(skill.getName())
-                            .category(skill.getCategory().name())
+                            .category(skill.getCategory())
                             .importance(r.getImportance())
                             .build();
                 })

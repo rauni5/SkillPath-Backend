@@ -11,6 +11,10 @@ public class SkillCheckAttempt {
  @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
  @Column(name = "user_id", nullable = false) private Long userId;
  @Column(name = "skill_id", nullable = false) private Long skillId;
+ /** Which shared pool set this attempt used — null for attempts created
+  *  before the question-pool feature existed. Lets the service tell which
+  *  sets a user has already seen for a skill. */
+ @Column(name = "question_set_id") private Long questionSetId;
  /** Full quiz including correct answers, stored server-side only. */
  @Column(name = "questions_json", nullable = false, columnDefinition = "TEXT") private String questionsJson;
  @Enumerated(EnumType.STRING) @Builder.Default

@@ -29,4 +29,5 @@ public class PortfolioResponse {
     private List<ProjectResponse> projects;
     private List<PortfolioItemResponse> portfolioItems;
     private List<CertificationResponse> certifications;
+    private List<EducationResponse> education;
 }

@@ -8,8 +8,8 @@ import java.util.List;
 @Service @RequiredArgsConstructor
 public class DashboardService {
     private final CareerGoalService goalService;
+    private final ProjectService projectService;
     private final RoadmapStepRepository stepRepo;
-    private final ProjectRepository projectRepo;
     private final ProjectMemberRepository memberRepo;
     private final SkillRepository skillRepo;
     public DashboardResponse getDashboard(Long userId) {
@@ -40,8 +40,8 @@ public class DashboardService {
         List<ProjectResponse> active = memberRepo
                                             .findByUserIdAndStatus(userId, MemberStatus.ACCEPTED)
                                             .stream()
-                                            .map(pm -> projectRepo.findById(pm.getProjectId())
-                                            .map(ProjectResponse::from).orElseThrow())
+                                            .limit(3)
+                                            .map(pm -> projectService.getById(pm.getProjectId()))
                                             .toList();
         return DashboardResponse.builder()
                             .careerProgressPercent(progress)
@@ -53,5 +53,6 @@ public class DashboardService {
                             .roadmapTotalSteps(steps.size())
                             .nextSkillsToLearn(nextSkills)
                             .activeProjects(active).build();
+                            
     }
 }

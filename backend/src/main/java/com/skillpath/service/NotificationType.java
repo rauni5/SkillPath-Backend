@@ -20,7 +20,10 @@ public enum NotificationType {
     JOIN_REQUEST_REJECTED("PROJECT_JOIN_REQUEST_REJECTED"),
 
     /** Someone commented on your discussion post. */
-    DISCUSSION_COMMENT_RECEIVED("PROJECT_DISCUSSION_COMMENT_RECEIVED");
+    DISCUSSION_COMMENT_RECEIVED("PROJECT_DISCUSSION_COMMENT_RECEIVED"),
+
+    /** The owner cancelled a project you were an accepted member of. */
+    PROJECT_CANCELLED("PROJECT_CANCELLED");
 
     private final String value;
 

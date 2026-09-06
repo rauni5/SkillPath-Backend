@@ -5,9 +5,11 @@ import com.skillpath.dto.response.ChatMessageResponse;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.ChatMessage.ChatMessage;
 import com.skillpath.model.Skill.Skill;
+import com.skillpath.model.SkillTutorIntro.SkillTutorIntro;
 import com.skillpath.model.enums.MessageRole;
 import com.skillpath.repository.ChatMessageRepository;
 import com.skillpath.repository.SkillRepository;
+import com.skillpath.repository.SkillTutorIntroRepository;
 import com.skillpath.repository.UserSkillRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +25,7 @@ public class TutorChatService {
     private static final int MAX_CONTEXT_MESSAGES = 6;
 
     private final ChatMessageRepository chatRepo;
+    private final SkillTutorIntroRepository introRepo;
     private final SkillRepository skillRepo;
     private final UserSkillRepository userSkillRepo;
     private final GeminiClient geminiClient;
@@ -30,6 +33,47 @@ public class TutorChatService {
     public List<ChatMessageResponse> getHistory(Long userId, Long skillId) {
         return chatRepo.findByUserIdAndSkillIdOrderByCreatedAtAsc(userId, skillId)
                 .stream().map(this::toResponse).toList();
+    }
+
+    /**
+     * Starts a fresh conversation by having the tutor speak first — but
+     * unlike a real reply, this "welcome to this skill" message is generic
+     * pedagogy (what the topic covers, where to start), not personalized
+     * to the student, so it's cached per skill and reused for everyone's
+     * first visit instead of calling Gemini every single time. Only the
+     * assistant's message is persisted; there's no synthetic "hi, I'm
+     * ready" message from the student cluttering their history.
+     */
+    @Transactional
+    public ChatMessageResponse getIntro(Long userId, Long skillId) {
+        Skill skill = skillRepo.findById(skillId)
+                .orElseThrow(() -> new ResourceNotFoundException("Skill not found: " + skillId));
+
+        String introText = introRepo.findById(skillId)
+                .map(SkillTutorIntro::getIntroText)
+                .orElseGet(() -> generateAndCacheIntro(skill));
+
+        ChatMessage saved = chatRepo.save(ChatMessage.builder()
+                .userId(userId).skillId(skillId)
+                .role(MessageRole.ASSISTANT).content(introText)
+                .build());
+        return toResponse(saved);
+    }
+
+    private String generateAndCacheIntro(Skill skill) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("You are a friendly, patient tutor helping a student learn \"")
+          .append(skill.getName()).append("\" (category: ").append(skill.getCategory()).append("). ");
+        if (skill.getDescription() != null && !skill.getDescription().isBlank())
+            sb.append("Context on this skill: ").append(skill.getDescription()).append(". ");
+        sb.append("Keep it concise and welcoming.");
+
+        String reply = geminiClient.chat(sb.toString(), List.of(ChatTurn.user(
+                "Introduce \"" + skill.getName() + "\" to a student who's about to start learning it. " +
+                "Briefly explain what it covers and suggest a good place to begin.")));
+
+        introRepo.save(SkillTutorIntro.builder().skillId(skill.getId()).introText(reply).build());
+        return reply;
     }
 
     @Transactional

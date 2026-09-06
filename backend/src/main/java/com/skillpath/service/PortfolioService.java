@@ -1,25 +1,28 @@
 package com.skillpath.service;
 
 import com.skillpath.dto.request.AddCertificationRequest;
+import com.skillpath.dto.request.AddEducationRequest;
 import com.skillpath.dto.request.AddPortfolioItemRequest;
 import com.skillpath.dto.response.*;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.Certification.Certification;
+import com.skillpath.model.Education.Education;
 import com.skillpath.model.PortfolioItem.PortfolioItem;
 import com.skillpath.model.Project.Project;
 import com.skillpath.model.Skill.Skill;
 import com.skillpath.model.User.User;
 import com.skillpath.model.UserSkill.UserSkill;
 import com.skillpath.model.enums.MemberStatus;
+import com.skillpath.model.enums.ProjectStatus;
 import com.skillpath.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +37,7 @@ public class PortfolioService {
     private final CareerGoalService       goalService;
     private final CertificationRepository certRepo;
     private final ProjectRequiredSkillRepository reqSkillRepo;
+    private final EducationRepository     educationRepo;
 
     public List<PortfolioItemResponse> getPortfolio(Long userId) {
         if (!userRepo.existsById(userId))
@@ -82,7 +86,7 @@ public class PortfolioService {
         return PortfolioItemResponse.from(saved, projectName);
     }
 
-    
+
     @Transactional
     public void deleteItem(Long userId, Long itemId) {
         PortfolioItem item = portfolioRepo.findById(itemId)
@@ -137,6 +141,39 @@ public class PortfolioService {
         certRepo.delete(cert);
     }
 
+    public List<EducationResponse> getEducation(Long userId) {
+        return educationRepo.findByUserIdOrderByStartDateDesc(userId)
+                .stream().map(EducationResponse::from).toList();
+    }
+
+    @Transactional
+    public EducationResponse addEducation(Long userId, AddEducationRequest req) {
+        if (!userRepo.existsById(userId))
+            throw new ResourceNotFoundException("User not found: " + userId);
+
+        Education edu = Education.builder()
+                .userId(userId)
+                .institution(req.getInstitution())
+                .degree(req.getDegree())
+                .fieldOfStudy(req.getFieldOfStudy())
+                .startDate(req.getStartDate())
+                .endDate(req.getEndDate())
+                .description(req.getDescription())
+                .build();
+
+        return EducationResponse.from(educationRepo.save(edu));
+    }
+
+    @Transactional
+    public void deleteEducation(Long userId, Long eduId) {
+        Education edu = educationRepo.findById(eduId)
+                .orElseThrow(() -> new ResourceNotFoundException("Education entry not found: " + eduId));
+        if (!edu.getUserId().equals(userId))
+            throw new SecurityException("User " + userId + " does not own education entry " + eduId);
+
+        educationRepo.delete(edu);
+    }
+
     /** Comma- or newline-separated free text -> a clean list, dropping blanks. */
     private List<String> parseSoftSkills(String raw) {
         if (raw == null || raw.isBlank()) return List.of();
@@ -149,8 +186,8 @@ public class PortfolioService {
     /**
      * Everything the Portfolio screen (and CV export, built from the same
      * data client-side) needs in one call: profile basics, career goal
-     * progress, skills with proficiency, projects owned/joined, and any
-     * manually-added or auto-generated portfolio items.
+     * progress, skills with proficiency, projects owned/joined, education,
+     * and certifications.
      */
     public PortfolioResponse getSummary(Long userId, Long viewerId) {
         boolean isSelf = userId.equals(viewerId);
@@ -172,19 +209,12 @@ public class PortfolioService {
                 .filter(s -> s != null)
                 .toList();
 
-        // Owned + accepted-membership projects, deduplicated (an owner is
-        // never also a "member" row for their own project, but keep this
-        // safe against that changing later).
-        Map<Long, ProjectResponse> projectsById = new LinkedHashMap<>();
-        projectRepo.findByOwnerId(userId, org.springframework.data.domain.Pageable.unpaged())
-                .forEach(p -> projectsById.put(p.getId(), toProjectResponse(p)));
-        memberRepo.findByUserIdAndStatus(userId, MemberStatus.ACCEPTED).forEach(pm ->
-                projectRepo.findById(pm.getProjectId())
-                        .ifPresent(p -> projectsById.putIfAbsent(p.getId(), toProjectResponse(p))));
+        List<ProjectResponse> projects = getUserProjects(userId);
 
         List<PortfolioItemResponse> items = getPortfolio(userId);
         List<CertificationResponse> certifications = certRepo.findByUserIdOrderByEarnedOnDesc(userId)
                 .stream().map(CertificationResponse::from).toList();
+        List<EducationResponse> education = getEducation(userId);
 
         return PortfolioResponse.builder()
                 .userId(user.getId())
@@ -203,9 +233,10 @@ public class PortfolioService {
                 .careerGoalRoleName(careerGoalRoleName)
                 .careerProgressPercent(careerProgressPercent)
                 .skills(skills)
-                .projects(List.copyOf(projectsById.values()))
+                .projects(projects)
                 .portfolioItems(items)
                 .certifications(certifications)
+                .education(education)
                 .build();
     }
 
@@ -218,6 +249,24 @@ public class PortfolioService {
                 .category(skill.getCategory())
                 .proficiency(us.getProficiency())
                 .build();
+    }
+
+    /** Owned + accepted-membership projects, deduplicated, excluding
+     *  cancelled ones. Extracted out of {@link #getSummary} so
+     *  PublicProfileService can build the same "Projects" list for a
+     *  public profile without duplicating this logic. */
+    public List<ProjectResponse> getUserProjects(Long userId) {
+        Set<Long> projectIds = new LinkedHashSet<>();
+        projectRepo.findByOwnerId(userId, org.springframework.data.domain.Pageable.unpaged())
+                .forEach(p -> projectIds.add(p.getId()));
+
+        memberRepo.findByUserIdAndStatus(userId, MemberStatus.ACCEPTED)
+                .forEach(pm -> projectIds.add(pm.getProjectId()));
+
+        return projectRepo.findAllById(projectIds).stream()
+                .filter(p -> p.getStatus() != ProjectStatus.CANCELLED)
+                .map(this::toProjectResponse)
+                .toList();
     }
 
     private ProjectResponse toProjectResponse(Project p) {
