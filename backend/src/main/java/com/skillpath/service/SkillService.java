@@ -6,7 +6,6 @@ import com.skillpath.dto.response.SkillWithProficiencyResponse;
 import com.skillpath.exception.ResourceNotFoundException;
 import com.skillpath.model.UserSkill.UserSkill;
 import com.skillpath.model.UserSkill.UserSkillId;
-import com.skillpath.model.enums.Proficiency;
 import com.skillpath.repository.SkillDependencyRepository;
 import com.skillpath.repository.SkillRepository;
 import com.skillpath.repository.UserSkillRepository;
@@ -56,7 +55,7 @@ public class SkillService {
             if (!userSkillRepo.existsById(id)) {
                 userSkillRepo.save(UserSkill.builder()
                         .userId(userId).skillId(prereqId)
-                        .proficiency(Proficiency.BEGINNER).build());
+                        .proficiency(req.getProficiency()).build());
             }
         }
     }

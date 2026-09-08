@@ -8,5 +8,9 @@ public enum SkillCategory {
     CLOUD, 
     DATABASE, 
     DATA_ENGINEERING, 
-    UI_UX
+    UI_UX,
+    GAME_DEV,
+    CYBERSECURITY,
+    QA_TESTING,
+    AI_ML
 }

@@ -8,8 +8,7 @@ CREATE TABLE users (
  location VARCHAR(255),
  active boolean NOT NULL DEFAULT true,
  soft_skills TEXT,
- experience_level VARCHAR(20) CHECK (experience_level IN
-('BEGINNER','INTERMEDIATE','ADVANCED')),
+ experience_level VARCHAR(20) CHECK (experience_level IN ('BEGINNER','INTERMEDIATE','ADVANCED')),
  availability BOOLEAN NOT NULL DEFAULT TRUE,
  avatar_url VARCHAR(500),
  github_url VARCHAR(255),
@@ -32,8 +31,7 @@ CREATE TABLE skill_dependencies (
 CREATE TABLE user_skills (
  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
- proficiency VARCHAR(20) CHECK (proficiency IN
-('BEGINNER','INTERMEDIATE','ADVANCED')),
+ proficiency VARCHAR(20) CHECK (proficiency IN ('BEGINNER','INTERMEDIATE','ADVANCED')),
  added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  PRIMARY KEY (user_id, skill_id)
 );
@@ -42,18 +40,19 @@ CREATE TABLE career_roles (
  name VARCHAR(100) UNIQUE NOT NULL,
  description TEXT
 );
-CREATE TABLE role_required_skills (
- role_id BIGINT NOT NULL REFERENCES career_roles(id) ON DELETE CASCADE,
- skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
- importance INT NOT NULL CHECK (importance BETWEEN 1 AND 10),
- PRIMARY KEY (role_id, skill_id)
-);
 CREATE TABLE role_branches (
  id BIGSERIAL PRIMARY KEY,
  role_id BIGINT NOT NULL REFERENCES career_roles(id) ON DELETE CASCADE,
  name VARCHAR(100) NOT NULL,
  description TEXT,
  UNIQUE(role_id, name)
+);
+
+CREATE TABLE branch_required_skills (
+ branch_id BIGINT NOT NULL REFERENCES role_branches(id) ON DELETE CASCADE,
+ skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+ importance INT NOT NULL CHECK (importance BETWEEN 1 AND 10),
+ PRIMARY KEY (branch_id, skill_id)
 );
 CREATE TABLE user_career_goals (
  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -65,8 +64,7 @@ CREATE TABLE projects (
  id BIGSERIAL PRIMARY KEY,
  name VARCHAR(200) NOT NULL,
  description TEXT,
- difficulty VARCHAR(20) CHECK (difficulty IN
-('BEGINNER','INTERMEDIATE','ADVANCED')),
+ difficulty VARCHAR(20) CHECK (difficulty IN ('BEGINNER','INTERMEDIATE','ADVANCED')),
  team_size INT,
  status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
  owner_id BIGINT REFERENCES users(id),
@@ -125,23 +123,6 @@ CREATE TABLE chat_messages (
  content TEXT NOT NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE TABLE skill_check_attempts (
- id BIGSERIAL PRIMARY KEY,
- user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
- skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
- questions_json TEXT NOT NULL,
- status VARCHAR(20) NOT NULL DEFAULT 'GENERATED' CHECK (status IN ('GENERATED','SUBMITTED')),
- score INT,
- proficiency VARCHAR(20) CHECK (proficiency IN ('BEGINNER','INTERMEDIATE','ADVANCED')),
- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
- submitted_at TIMESTAMPTZ
-);
-CREATE TABLE branch_required_skills (
- branch_id BIGINT NOT NULL REFERENCES role_branches(id) ON DELETE CASCADE,
- skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
- importance INT NOT NULL CHECK (importance BETWEEN 1 AND 10),
- PRIMARY KEY (branch_id, skill_id)
-);
 CREATE TABLE dashboard_summaries (
  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
  content TEXT NOT NULL,
@@ -153,7 +134,7 @@ CREATE TABLE assistant_sessions (
  title VARCHAR(120),
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE TABLE Assistant_messages (
+CREATE TABLE assistant_messages (
  id BIGSERIAL PRIMARY KEY,
  session_id BIGINT NOT NULL REFERENCES assistant_sessions(id) ON DELETE CASCADE,
  role VARCHAR(10) NOT NULL CHECK (role IN ('USER','ASSISTANT')),
@@ -216,11 +197,17 @@ CREATE TABLE project_comment_likes (
  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  PRIMARY KEY (comment_id, user_id)
 );
-CREATE INDEX idx_project_posts_board ON project_posts(project_id, channel, created_at);
-CREATE INDEX idx_project_comments_post ON project_comments(post_id, created_at);
-CREATE INDEX idx_user_achievements_user ON user_achievements(user_id);
-CREATE INDEX idx_assistant_sessions_user ON assistant_sessions(user_id, created_at);
-CREATE INDEX idx_assistant_messages_session ON assistant_messages(session_id, created_at);
+CREATE TABLE education (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    institution VARCHAR(200) NOT NULL,
+    degree VARCHAR(150),
+    field_of_study VARCHAR(150),
+    start_date DATE,
+    end_date DATE,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 CREATE TABLE certifications (
  id BIGSERIAL PRIMARY KEY,
  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -230,6 +217,36 @@ CREATE TABLE certifications (
  earned_on DATE,
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE TABLE skill_check_question_sets (
+ id BIGSERIAL PRIMARY KEY,
+ skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+ questions_json TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE skill_check_attempts (
+ id BIGSERIAL PRIMARY KEY,
+ user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+ questions_json TEXT NOT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'GENERATED' CHECK (status IN ('GENERATED','SUBMITTED')),
+ score INT,
+ proficiency VARCHAR(20) CHECK (proficiency IN ('BEGINNER','INTERMEDIATE','ADVANCED')),
+ question_set_id BIGINT REFERENCES skill_check_question_sets(id),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ submitted_at TIMESTAMPTZ
+);
+CREATE TABLE skill_tutor_intros (
+ skill_id BIGINT PRIMARY KEY REFERENCES skills(id) ON DELETE CASCADE,
+ intro_text TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_skill_check_question_sets_skill ON skill_check_question_sets(skill_id);
+CREATE INDEX idx_education_user_id ON education(user_id);
+CREATE INDEX idx_project_posts_board ON project_posts(project_id, channel, created_at);
+CREATE INDEX idx_project_comments_post ON project_comments(post_id, created_at);
+CREATE INDEX idx_user_achievements_user ON user_achievements(user_id);
+CREATE INDEX idx_assistant_sessions_user ON assistant_sessions(user_id, created_at);
+CREATE INDEX idx_assistant_messages_session ON assistant_messages(session_id, created_at);
 CREATE INDEX idx_certifications_user_id ON certifications(user_id);
 CREATE INDEX idx_chat_messages_user_skill ON chat_messages(user_id, skill_id, created_at);
 CREATE INDEX idx_skill_check_attempts_user_skill ON skill_check_attempts(user_id, skill_id);

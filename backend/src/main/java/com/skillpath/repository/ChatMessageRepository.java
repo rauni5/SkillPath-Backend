@@ -8,4 +8,5 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
  List<ChatMessage> findByUserIdAndSkillIdOrderByCreatedAtAsc(Long userId, Long skillId);
  List<ChatMessage> findByUserIdAndSkillIdOrderByCreatedAtDesc(Long userId, Long skillId, Pageable pageable);
  long countByUserIdAndRole(Long userId, MessageRole role);
+ List<ChatMessage> findByUserIdAndRole(Long userId, MessageRole role);
 }

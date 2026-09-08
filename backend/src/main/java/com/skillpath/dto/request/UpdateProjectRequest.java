@@ -5,7 +5,7 @@ import java.util.Set;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class UpdateProjectRequest {
     @NotBlank @Size(max = 200) private String name;
-    private String description;
+    @NotBlank private String description;
     private String difficulty;
     @Size(max = 500) private String link;
     @Min(1) @Max(20) private Integer teamSize;

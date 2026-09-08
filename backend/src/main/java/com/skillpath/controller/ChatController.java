@@ -25,6 +25,13 @@ public class ChatController {
         return ResponseEntity.ok(ApiResponse.ok(chatService.getHistory(userId, skillId)));
     }
 
+    @PostMapping("/intro")
+    public ResponseEntity<ApiResponse<ChatMessageResponse>> intro(
+            @PathVariable Long userId, @PathVariable Long skillId, Authentication auth) {
+        requireSelf(userId, auth);
+        return ResponseEntity.ok(ApiResponse.ok(chatService.getIntro(userId, skillId)));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<ChatMessageResponse>> send(
             @PathVariable Long userId, @PathVariable Long skillId,

@@ -17,6 +17,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
  Optional<User> findByFirebaseUid(String firebaseUid);
  boolean existsByFirebaseUid(String firebaseUid);
 
+ /** Single query does both the lookup and the enabled check, so a
+  *  disabled profile's token 404s exactly the same as an unknown one —
+  *  doesn't leak whether the token used to be valid. */
+ Optional<User> findByPublicProfileTokenAndPublicProfileEnabledTrue(String token);
+
  /** Case-insensitive substring match on name or email; used by the admin
   *  user list search box. Pass null/blank q to just page through everyone.
   *  adminFilter/activeFilter are optional (null = don't filter on that). */

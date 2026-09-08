@@ -29,6 +29,8 @@ public class ProjectService {
     private final UserRepository userRepo;
     private final PortfolioService portfolioService;
     private final NotificationService notificationService;
+    private final ProjectDiscussionService discussionService;
+    private final UserSkillRepository userSkillRepo;
     public Page<ProjectResponse> browseOpen(Pageable pageable) {
         return projectRepo.findByStatus(ProjectStatus.OPEN, pageable).map(this::enrich);
     }
@@ -130,6 +132,7 @@ public class ProjectService {
         if (targetUserId.equals(project.getOwnerId()))
             throw new IllegalStateException("The project owner can't be removed.");
         memberRepo.deleteById(new ProjectMemberId(projectId, targetUserId));
+        refreshFullStatus(project);
     }
     @Transactional
     public ProjectResponse create(Long ownerId, CreateProjectRequest req) {
@@ -152,6 +155,8 @@ public class ProjectService {
                             .status(MemberStatus.ACCEPTED)
                             .role("Owner")
                             .invitedByOwner(false).build());
+        // Seed the public board so the discussion never opens empty.
+        discussionService.createAboutPost(p.getId(), ownerId, p.getName(), p.getDescription());
         return enrich(p);
     }
     @Transactional
@@ -177,14 +182,15 @@ public class ProjectService {
     @Transactional
     public void requestJoin(Long projectId, Long userId) {
         if (memberRepo.existsByProjectIdAndUserId(projectId, userId)) throw new IllegalStateException("Already requested or joined");
+        Project project = projectRepo.findById(projectId).orElseThrow(() -> new ResourceNotFoundException("Project not found: " + projectId));
+        requireOpenForNewMember(project);
         memberRepo.save(ProjectMember.builder()
                             .projectId(projectId)
                             .userId(userId)
                             .status(MemberStatus.PENDING)
                             .invitedByOwner(false).build());
 
-        Project project = projectRepo.findById(projectId).orElseThrow();
-        User requester = userRepo.findById(userId).orElseThrow();
+                User requester = userRepo.findById(userId).orElseThrow();
         notificationService.notifyUser(
                 project.getOwnerId(),
                 "New join request",
@@ -192,13 +198,24 @@ public class ProjectService {
                 Map.of("type", NotificationType.JOIN_REQUEST_RECEIVED.getValue(),
                        "projectId", String.valueOf(projectId)));
     }
+    private void requireOpenForNewMember(Project project) {
+        if (project.getStatus() != ProjectStatus.OPEN)
+            throw new IllegalStateException(switch (project.getStatus()) {
+                case FULL -> "This project's team is already full.";
+                case COMPLETED -> "This project has already been completed.";
+                case CANCELLED -> "This project has been cancelled.";
+                default -> "This project isn't accepting new members right now.";
+            });
+    }
     @Transactional
     public void updateMemberStatus(Long projectId, Long requesterId, Long userId, UpdateMemberStatusRequest req) {
         Project project = requireOwner(projectId, requesterId);
         ProjectMember m = memberRepo.findById(new ProjectMemberId(projectId, userId))
                                         .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
+        if (req.getStatus() == MemberStatus.ACCEPTED) requireOpenForNewMember(project);
         m.setStatus(req.getStatus());
         memberRepo.save(m);
+        refreshFullStatus(project);
 
         if (req.getStatus() == MemberStatus.ACCEPTED || req.getStatus() == MemberStatus.REJECTED) {
             boolean accepted = req.getStatus() == MemberStatus.ACCEPTED;
@@ -210,10 +227,21 @@ public class ProjectService {
                            "projectId", String.valueOf(projectId)));
         }
     }
+    private void refreshFullStatus(Project project) {
+        if (project.getTeamSize() == null) return;
+        if (project.getStatus() != ProjectStatus.OPEN && project.getStatus() != ProjectStatus.FULL) return;
+        long acceptedCount = memberRepo.findByProjectIdAndStatus(project.getId(), MemberStatus.ACCEPTED).size();
+        ProjectStatus newStatus = acceptedCount >= project.getTeamSize() ? ProjectStatus.FULL : ProjectStatus.OPEN;
+        if (newStatus != project.getStatus()) {
+            project.setStatus(newStatus);
+            projectRepo.save(project);
+        }
+    }
     // --- Owner-initiated invites ---
     @Transactional
     public void inviteMember(Long projectId, Long ownerId, Long targetUserId) {
         Project project = requireOwner(projectId, ownerId);
+        requireOpenForNewMember(project);
         if (memberRepo.existsByProjectIdAndUserId(projectId, targetUserId))
             throw new IllegalStateException("This person already has a pending request, invite, or membership on this project.");
         memberRepo.save(ProjectMember.builder()
@@ -234,11 +262,49 @@ public class ProjectService {
                 .filter(m -> m.isInvitedByOwner() && m.getStatus() == MemberStatus.PENDING)
                 .map(m -> {
                     Project p = projectRepo.findById(m.getProjectId()).orElseThrow();
+                    List<SkillResponse> skills = reqSkillRepo.findByProjectId(p.getId()).stream()
+                            .map(rs -> skillRepo.findById(rs.getSkillId()).map(SkillResponse::from).orElse(null))
+                            .filter(s -> s != null)
+                            .toList();
+                    int memberCount = memberRepo.findByProjectIdAndStatus(p.getId(), MemberStatus.ACCEPTED).size() + 1;
+                    User owner = userRepo.findById(p.getOwnerId()).orElse(null);
                     return ProjectInviteResponse.builder()
                             .projectId(p.getId())
                             .projectName(p.getName())
+                            .description(p.getDescription())
                             .difficulty(p.getDifficulty())
                             .teamSize(p.getTeamSize())
+                            .memberCount(memberCount)
+                            .ownerId(p.getOwnerId())
+                            .ownerName(owner == null ? null : owner.getName())
+                            .ownerAvatarUrl(owner == null ? null : owner.getAvatarUrl())
+                            .requiredSkills(skills)
+                            .invitedAt(m.getJoinedAt())
+                            .build();
+                })
+                .toList();
+    }
+
+    public List<ProjectJoinRequestResponse> getMyPendingJoinRequests(Long ownerId) {
+        return memberRepo.findPendingJoinRequestsForOwner(ownerId, MemberStatus.PENDING).stream()
+                .map(m -> {
+                    Project p = projectRepo.findById(m.getProjectId()).orElseThrow();
+                    User requester = userRepo.findById(m.getUserId()).orElseThrow();
+                    
+                    List<SkillResponse> skills = userSkillRepo.findByUserId(requester.getId()).stream()
+                            .map(us -> skillRepo.findById(us.getSkillId())
+                                    .map(SkillResponse::from)
+                                    .orElse(null))
+                            .filter(java.util.Objects::nonNull)
+                            .toList();
+
+                    return ProjectJoinRequestResponse.builder()
+                            .projectId(p.getId())
+                            .projectName(p.getName())
+                            .requesterId(requester.getId())
+                            .requesterName(requester.getName())
+                            .requesterAvatarUrl(requester.getAvatarUrl())
+                            .requesterSkills(skills)
                             .build();
                 })
                 .toList();
@@ -251,12 +317,16 @@ public class ProjectService {
             throw new ForbiddenException("This isn't an invite you can respond to.");
         if (!m.getUserId().equals(userId))
             throw new ForbiddenException("You can only respond to your own invites.");
+
+        Project project = projectRepo.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found: " + projectId));
+        boolean accepted = req.getStatus() == MemberStatus.ACCEPTED;
+        if (accepted) requireOpenForNewMember(project);
+
         m.setStatus(req.getStatus());
         memberRepo.save(m);
-
-        if (req.getStatus() == MemberStatus.ACCEPTED || req.getStatus() == MemberStatus.REJECTED) {
-            boolean accepted = req.getStatus() == MemberStatus.ACCEPTED;
-            Project project = projectRepo.findById(projectId).orElseThrow();
+        refreshFullStatus(project);
+        if (accepted || req.getStatus() == MemberStatus.REJECTED) {
             User invitee = userRepo.findById(userId).orElseThrow();
             notificationService.notifyUser(
                     project.getOwnerId(),
@@ -298,10 +368,8 @@ public class ProjectService {
         return resp;
     }
     @Transactional
-    public ProjectResponse completeProject(Long projectId) {
-        Project project = projectRepo.findById(projectId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Project not found: " + projectId));
+    public ProjectResponse completeProject(Long projectId, Long requesterId) {
+        Project project = requireOwner(projectId, requesterId);
     
         project.setStatus(ProjectStatus.COMPLETED);
         projectRepo.save(project);
@@ -324,5 +392,47 @@ public class ProjectService {
         );
     
         return enrich(project);
+    }
+
+    /** Cancels a project — a terminal state like completion, but without
+     *  portfolio generation. Notifies every currently-accepted member
+     *  (not pending requests, they were never part of the team). */
+    @Transactional
+    public ProjectResponse cancelProject(Long projectId, Long requesterId) {
+        Project project = requireOwner(projectId, requesterId);
+
+        project.setStatus(ProjectStatus.CANCELLED);
+        projectRepo.save(project);
+
+        memberRepo.findByProjectIdAndStatus(projectId, MemberStatus.ACCEPTED)
+                .forEach(member -> notificationService.notifyUser(
+                        member.getUserId(),
+                        "Project cancelled",
+                        "\"" + project.getName() + "\" has been cancelled by its owner.",
+                        Map.of("type", NotificationType.PROJECT_CANCELLED.getValue(),
+                               "projectId", String.valueOf(projectId))));
+
+        return enrich(project);
+    }
+    public Page<ProjectResponse> getMyProjects(Long userId, Pageable pageable) {
+        List<Long> projectIds = memberRepo.findByUserId(userId).stream()
+                .filter(m -> m.getStatus() == MemberStatus.ACCEPTED)
+                .map(ProjectMember::getProjectId)
+                .toList();
+
+        if (projectIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        return projectRepo.findByIdIn(projectIds, pageable)
+                .map(project -> {
+                    ProjectResponse res = enrich(project);
+                    res.setViewerMembershipStatus(MemberStatus.ACCEPTED);
+                    res.setViewerInvitedByOwner(
+                        memberRepo.findById(new ProjectMemberId(project.getId(), userId))
+                                  .map(ProjectMember::isInvitedByOwner)
+                                  .orElse(false)
+                    );
+                    return res;
+                });
     }
 }

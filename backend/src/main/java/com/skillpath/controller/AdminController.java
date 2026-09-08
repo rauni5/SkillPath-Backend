@@ -27,6 +27,13 @@ public class AdminController {
     private final AdminService adminService;
 
     // SKILL MANAGEMENT
+    /** Distinct categories already in use — powers the free-form category
+     *  autocomplete on the admin skill form instead of a fixed enum. */
+    @GetMapping("/skills/categories")
+    public ResponseEntity<ApiResponse<List<String>>> listSkillCategories() {
+        return ResponseEntity.ok(ApiResponse.ok(adminService.listSkillCategories()));
+    }
+
     @GetMapping("/skills/{skillId}")
     public ResponseEntity<ApiResponse<SkillResponse>> getSkill(@PathVariable Long skillId) {
         return ResponseEntity.ok(ApiResponse.ok(adminService.getSkill(skillId)));
