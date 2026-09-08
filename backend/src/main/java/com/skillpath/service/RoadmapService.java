@@ -139,6 +139,6 @@ public class RoadmapService {
     private RoadmapStepResponse toResponse(RoadmapStep s) {
         var skill = skillRepo.findById(s.getSkillId()).orElseThrow();
         return RoadmapStepResponse.from(s, skill.getName(),
-        skill.getCategory().name());
+        skill.getCategory());
     }
 }

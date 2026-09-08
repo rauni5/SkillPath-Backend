@@ -11,6 +11,17 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
  Page<Project> findByStatus(ProjectStatus status, Pageable pageable);
  Page<Project> findByOwnerId(Long ownerId, Pageable pageable);
  long countByOwnerId(Long ownerId);
+ long countByStatus(ProjectStatus status);
+
+ /** Batch owned-project counts, keyed by owner id — used by the admin
+  *  user list so a page of N users costs one query instead of N. */
+ @Query("SELECT p.ownerId AS ownerId, COUNT(p) AS cnt FROM Project p WHERE p.ownerId IN :ownerIds GROUP BY p.ownerId")
+ List<CountByOwner> countByOwnerIds(@Param("ownerIds") List<Long> ownerIds);
+
+ interface CountByOwner {
+     Long getOwnerId();
+     long getCnt();
+ }
 
  @Query("""
      SELECT DISTINCT p FROM Project p
@@ -28,4 +39,5 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
                        @Param("roleIds") List<Long> roleIds,
                        @Param("q") String q,
                        Pageable pageable);
+ Page<Project> findByIdIn(List<Long> ids, Pageable pageable);
 }

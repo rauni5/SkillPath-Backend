@@ -32,4 +32,10 @@ public class User {
  @Column(name = "is_admin", nullable = false)
  @Builder.Default
  private boolean admin = false;
+ @Column(nullable = false)@Builder.Default
+ private boolean active = true;
+ @Column(name = "public_profile_enabled", nullable = false) @Builder.Default
+ private boolean publicProfileEnabled = false;
+ @Column(name = "public_profile_token", unique = true, length = 64)
+ private String publicProfileToken;
 }

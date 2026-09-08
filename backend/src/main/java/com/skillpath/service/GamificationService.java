@@ -2,6 +2,9 @@ package com.skillpath.service;
 import com.skillpath.dto.response.AchievementResponse;
 import com.skillpath.dto.response.StreakResponse;
 import com.skillpath.model.Achievement.Achievement;
+import com.skillpath.model.ChatMessage.ChatMessage;
+import com.skillpath.model.ProjectComment.ProjectComment;
+import com.skillpath.model.ProjectMember.ProjectMember;
 import com.skillpath.model.RoadmapStep.RoadmapStep;
 import com.skillpath.model.SkillCheckAttempt.SkillCheckAttempt;
 import com.skillpath.model.UserAchievement.UserAchievement;
@@ -24,8 +27,9 @@ import java.util.stream.Collectors;
  * Computes and unlocks achievements, and tracks the user's daily activity
  * streak. Everything here is derived from data that already exists elsewhere
  * (roadmap completions, passed skill checks, project membership, tutor chat
- * activity) — evaluated lazily whenever the achievements/streak screens are
- * opened, with newly-met achievements persisted permanently at that point.
+ * activity, and project discussion comments) — evaluated lazily whenever the
+ * achievements/streak screens are opened, with newly-met achievements
+ * persisted permanently at that point.
  */
 @Service @RequiredArgsConstructor
 public class GamificationService {
@@ -39,6 +43,7 @@ public class GamificationService {
     private final ProjectMemberRepository memberRepo;
     private final ProjectRepository projectRepo;
     private final ChatMessageRepository chatMessageRepo;
+    private final ProjectCommentRepository projectCommentRepo;
 
     @Transactional
     public List<AchievementResponse> getAchievements(Long userId) {
@@ -123,13 +128,38 @@ public class GamificationService {
                 (int) projectsJoined, (int) projectsCreated, (int) tutorMessagesSent);
     }
 
+    /**
+     * A day counts toward the streak if the user did *any* of these on it:
+     * completed a roadmap step, passed a skill check, sent a tutor chat
+     * message, posted a project discussion comment, or joined a project.
+     * Previously only the first two counted — tutor chat and project
+     * activity are common ways someone genuinely engages with the app on a
+     * given day and were unfairly excluded.
+     */
     private StreakResponse computeAndPersistStreak(Long userId) {
         Set<LocalDate> activeDates = new TreeSet<>();
+
         stepRepo.findByUserIdOrderByStepOrder(userId).stream()
                 .filter(s -> s.getStatus() == StepStatus.DONE && s.getCompletedAt() != null)
                 .forEach(s -> activeDates.add(s.getCompletedAt().atZone(ZONE).toLocalDate()));
+
         attemptRepo.findByUserIdAndStatusAndProficiencyIsNotNull(userId, SkillCheckStatus.SUBMITTED).stream()
                 .map(SkillCheckAttempt::getSubmittedAt)
+                .filter(Objects::nonNull)
+                .forEach(t -> activeDates.add(t.atZone(ZONE).toLocalDate()));
+
+        chatMessageRepo.findByUserIdAndRole(userId, MessageRole.USER).stream()
+                .map(ChatMessage::getCreatedAt)
+                .filter(Objects::nonNull)
+                .forEach(t -> activeDates.add(t.atZone(ZONE).toLocalDate()));
+
+        projectCommentRepo.findByAuthorId(userId).stream()
+                .map(ProjectComment::getCreatedAt)
+                .filter(Objects::nonNull)
+                .forEach(t -> activeDates.add(t.atZone(ZONE).toLocalDate()));
+
+        memberRepo.findByUserId(userId).stream()
+                .map(ProjectMember::getJoinedAt)
                 .filter(Objects::nonNull)
                 .forEach(t -> activeDates.add(t.atZone(ZONE).toLocalDate()));
 

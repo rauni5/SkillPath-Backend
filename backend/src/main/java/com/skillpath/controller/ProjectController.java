@@ -75,6 +75,14 @@ public class ProjectController {
         projectService.assertOwner(id, currentUserId(auth));
         return ResponseEntity.ok(ApiResponse.ok(recommendationService.recommendTeammates(id, topN)));
     }
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<ApiResponse<ProjectResponse>> complete(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.ok(projectService.completeProject(id, currentUserId(auth))));
+    }
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<ApiResponse<ProjectResponse>> cancel(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(ApiResponse.ok(projectService.cancelProject(id, currentUserId(auth))));
+    }
     private Long currentUserId(Authentication auth) {
         FirebasePrincipal p = (FirebasePrincipal) auth.getPrincipal();
         return userService.getEntityByFirebaseUid(p.getUid()).getId();
