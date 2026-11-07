@@ -1,6 +1,6 @@
 # SkillPath Backend
 
-REST API for **SkillPath**, a career learning and collaboration platform. Learners pick a career goal, get a personalised learning roadmap built from a skill-dependency graph, verify skills with AI-generated quizzes, and team up on projects with other learners.
+RREST API for **SkillPath**, a career learning and collaboration platform (14 controllers, 100+ endpoints, 30+ PostgreSQL tables). Learners pick a career goal, get a personalised learning roadmap built from a skill-dependency graph, verify skills with AI-generated quizzes, and team up on projects with other learners.
 
 The mobile client is a Flutter app: [skillpath_app](https://github.com/rauni5/skillpath_app).
 
@@ -100,8 +100,7 @@ The `algorithm` package holds the data-structure logic behind the learning featu
 Skill checks draw from a shared per-skill pool of question sets, so Gemini is only called when a skill has no sets yet or a user has already seen every set in the pool.
 
 ### Database
-
-Four Flyway migrations live in `src/main/resources/db/migration`:
+Four Flyway migrations live in src/main/resources/db/migration, managing a 30+ table PostgreSQL schema:
 
 | Migration | Contents |
 |---|---|
