@@ -6,4 +6,5 @@ public class MembershipStatusResponse {
     private Long projectId;
     private String projectName;
     private MemberStatus status;
+    private boolean invitedByOwner;
 }

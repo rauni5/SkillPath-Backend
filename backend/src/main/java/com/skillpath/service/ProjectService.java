@@ -347,6 +347,7 @@ public class ProjectService {
                             .projectId(p.getId())
                             .projectName(p.getName())
                             .status(m.getStatus())
+                            .invitedByOwner(m.isInvitedByOwner())
                             .build();
                 })
                 .toList();

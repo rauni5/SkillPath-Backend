@@ -188,6 +188,12 @@ public class AdminService {
     public List<AdminRoleSummaryResponse> listRolesWithStats() {
         List<CareerRole> roles = roleRepo.findAll();
 
+        // Map of roleId -> number of branches configured for that role
+        Map<Long, Long> branchCounts = branchRepo.countGroupedByRole().stream()
+                .collect(Collectors.toMap(
+                        UserCareerGoalRepository.CountByRole::getRoleId,
+                        UserCareerGoalRepository.CountByRole::getCnt));
+
         // Map of roleId -> count of distinct required skills across all branches of that role
         Map<Long, Long> requirementCounts = branchRequiredSkillRepo.countDistinctSkillsGroupedByRole().stream()
                 .collect(Collectors.toMap(
@@ -204,6 +210,7 @@ public class AdminService {
                         .id(r.getId())
                         .name(r.getName())
                         .description(r.getDescription())
+                        .branchCount(branchCounts.getOrDefault(r.getId(), 0L))
                         .requirementsCount(requirementCounts.getOrDefault(r.getId(), 0L))
                         .popularity(popularity.getOrDefault(r.getId(), 0L))
                         .build())

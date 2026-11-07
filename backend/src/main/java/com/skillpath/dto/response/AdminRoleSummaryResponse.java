@@ -9,6 +9,7 @@ public class AdminRoleSummaryResponse {
     private Long id;
     private String name;
     private String description;
+    private long branchCount;
     private long requirementsCount;
     /** How many users have set this role as their career goal. */
     private long popularity;
